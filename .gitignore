@@ -1,0 +1,2 @@
+node_modules/\n__pycache__/\n.env\n*.pyc\nvenv/\n.next/
+.env
