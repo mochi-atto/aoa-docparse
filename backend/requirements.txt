@@ -1,0 +1,19 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+sqlalchemy==2.0.31
+psycopg2-binary==2.9.9
+pydantic-settings==2.3.0
+python-multipart==0.0.9
+python-jose[cryptography]==3.3.0
+alembic==1.13.1
+
+# Utility bill parsing (cloud/LLM)
+llama-index==0.11.0
+llama-index-llms-openai==0.2.0
+openai==1.40.0
+
+# Appraisal bill parsing (local only)
+pdfplumber==0.11.2
+tabula-py==2.9.3
+
+# CORS

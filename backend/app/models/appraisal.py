@@ -13,20 +13,30 @@ class Appraisal(Base):
     original_filename = Column(String, nullable=False)
     uploaded_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    # Extracted fields (adjust based on your actual appraisal documents)
+    # Identification
+    entity_name = Column(String, nullable=True)
     property_address = Column(String, nullable=True)
-    parcel_id = Column(String, nullable=True)
-    tax_year = Column(Integer, nullable=True)
+    county = Column(String, nullable=True)
     appraisal_date = Column(Date, nullable=True)
 
-    # Values
-    land_value = Column(Float, nullable=True)
-    building_value = Column(Float, nullable=True)
-    total_appraised_value = Column(Float, nullable=True)
-    assessed_value = Column(Float, nullable=True)
-    tax_amount = Column(Float, nullable=True)
-    millage_rate = Column(Float, nullable=True)
-    exemptions = Column(Float, nullable=True)             # e.g., religious exemption amount
+    # Key values
+    cost_of_replacement_new = Column(Float, nullable=True)
+    total_exclusions = Column(Float, nullable=True)
+    cost_less_exclusions = Column(Float, nullable=True)
+    flood_value = Column(Float, nullable=True)
+
+    # Building details
+    year_built = Column(Integer, nullable=True)
+    num_stories = Column(Integer, nullable=True)
+    gross_sq_ft = Column(Integer, nullable=True)
+    construction_type = Column(String, nullable=True)
+
+    # Appraiser info
+    appraiser_firm = Column(String, nullable=True)
+    appraiser_name = Column(String, nullable=True)
+
+    # Building breakdown stored as JSON array
+    building_breakdown = Column(JSON, nullable=True)
 
     # Raw extraction for debugging
     raw_extracted = Column(JSON, nullable=True)

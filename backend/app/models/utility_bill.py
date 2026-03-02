@@ -16,6 +16,8 @@ class UtilityBill(Base):
     # Extracted fields
     provider_name = Column(String, nullable=True)        # e.g., "Georgia Power"
     utility_type = Column(String, nullable=True)          # electric, gas, water, sewer, etc.
+    service_address = Column(String, nullable=True)       # Specific address this bill is for
+    building_name = Column(String, nullable=True)         # Short label: "Rectory", "Church", etc.
     bill_date = Column(Date, nullable=False)              # The date ON the bill
     due_date = Column(Date, nullable=True)
     billing_period_start = Column(Date, nullable=True)
