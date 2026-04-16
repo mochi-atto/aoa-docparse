@@ -1,10 +1,10 @@
-# Parish Document Parser
+# AoA Parish Management System
 
-A web application for church parishes to upload, parse, and manage utility bills and insurance appraisals. Built with React + FastAPI + PostgreSQL.
+A web application for church parishes to upload, parse, and manage utility bills and insurance appraisals. Built with React + FastAPI + PostgreSQL. Currently under development.
 
 ## Overview
 
-Parish Document Parser helps diocesan property managers track utility costs and building valuations across multiple parish properties. Upload a utility bill PDF and the system extracts structured data using OpenAI. Appraisals are entered through a guided form with PDF preview — no AI involved, keeping confidential data local.
+This system helps diocesan property managers track utility costs and building valuations across multiple parish properties. Upload a utility bill PDF and the system extracts structured data using OpenAI. Appraisals are entered through a guided form with PDF preview — no AI involved, keeping confidential data local.
 
 ### Key Features
 
@@ -238,17 +238,3 @@ The system normalizes utility types from LLM output:
 - `DELETE /api/parishes/{id}/todos/{tid}` — Delete task
 - `GET /api/parishes/{id}/history` — List history entries
 - `POST /api/data/history/{eid}/mark-removed` — Mark history entry as removed
-
-## Design Decisions
-
-- **Appraisals are local-only**: Appraisal documents contain confidential valuation data. The system never sends appraisal content to an LLM. Users enter data via the guided form with smart paste.
-- **General Expenses is not a building**: It's a virtual category for utility bills that aren't building-specific. Bills are assigned to it by setting `building_name = "General Expenses"` directly on each bill record.
-- **History is append-only**: Deletions mark entries as "removed" with strikethrough styling rather than deleting them, preserving the audit trail.
-- **Utility types are normalized**: The backend maps common LLM output variations to canonical types so that "trash", "garbage", and "refuse" all aggregate under "waste".
-
-## Development Notes
-
-- The frontend is a single `DashboardPage.tsx` component (~1700 lines) with tab-specific sub-components. This keeps state management simple — all data lives in the main component and is passed down as props.
-- Toast notifications auto-dismiss after 3.5 seconds and can be closed early.
-- PDF.js renders appraisal documents client-side with text extraction for copy-paste.
-- All data mutations trigger a `refreshData()` call that re-fetches everything from the API, ensuring consistency.
