@@ -119,7 +119,30 @@ async def upload_document(
             )
 
         else:  # appraisal
-            extracted = parse_appraisal(tmp_path)
+            # Fetch the active template (default first, then any)
+            from app.models.extraction_template import ExtractionTemplate
+            template_record = (
+                db.query(ExtractionTemplate)
+                .filter(ExtractionTemplate.is_default == True)
+                .first()
+            )
+            if not template_record:
+                # Fall back to any template
+                template_record = (
+                    db.query(ExtractionTemplate)
+                    .order_by(ExtractionTemplate.updated_at.desc())
+                    .first()
+                )
+
+            template_dict = None
+            if template_record:
+                template_dict = {
+                    "name": template_record.name,
+                    "field_patterns": template_record.field_patterns,
+                    "table_config": template_record.table_config,
+                }
+
+            extracted = parse_appraisal(tmp_path, template=template_dict)
 
             raw_for_json = _serialize_for_json(extracted)
 

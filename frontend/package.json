@@ -12,6 +12,7 @@
   "dependencies": {
     "@auth0/auth0-react": "^2.15.0",
     "axios": "^1.13.6",
+    "pdfjs-dist": "^5.6.205",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^6.30.3",

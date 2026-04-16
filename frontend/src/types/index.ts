@@ -15,12 +15,18 @@ export interface UtilityChartPoint {
 }
 
 export interface AppraisalChartPoint {
-  appraisal_date: string | null;
+  // Per-building fields
+  valuation_number: string | null;
+  building_name: string | null;
+  building_value: number | null;
+  content_value: number | null;
+  total_valuation: number | null;
+  // Document-level fields
   entity_name: string | null;
-  cost_of_replacement_new: number | null;
-  total_exclusions: number | null;
-  cost_less_exclusions: number | null;
-  flood_value: number | null;
+  appraisal_date: string | null;
+  expiration_date: string | null;
+  property_address: string | null;
+  appraiser_firm: string | null;
 }
 
 export interface UploadResponse {
