@@ -15,7 +15,7 @@ interface Parish { id: number; name: string; diocese: string; address: string; i
 interface UtilityBill { id: number; utility_type: string; bill_date: string; total_amount: number; building_name?: string; service_address?: string; account_number?: string; original_filename?: string; usage_quantity?: number; usage_unit?: string; provider_name?: string; }
 interface Appraisal { id: number; entity_name?: string; appraisal_date?: string; building_name?: string; building_value?: number; total_valuation?: number; gross_sq_ft?: number; property_address?: string; original_filename?: string; appraiser_firm?: string; expiration_date?: string; valuation_number?: string; content_value?: number; }
 interface TodoItem { id: number; text: string; building: string; priority: "red" | "yellow" | "green" | "blue"; prevPriority?: "red" | "yellow" | "green"; done: boolean; createdAt: string; }
-interface HistoryEntry { id: number; type: string; description: string; date: string; undone?: string; }
+interface HistoryEntry { id: number; type: string; description: string; date: string; undone?: string; user_email?: string; user_name?: string; }
 
 type TabKey = "dashboard" | "utility" | "valuations" | "risks" | "finances" | "history";
 
@@ -164,7 +164,7 @@ export default function DashboardPage() {
         done: t.done, createdAt: t.created_at,
       })));
       setHistory(histRes.data.map((h: any) => ({
-        id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone,
+        id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name,
       })));
     } catch (err) { console.error("Dashboard load error:", err); }
     finally { setLoading(false); }
@@ -179,7 +179,7 @@ export default function DashboardPage() {
       setAuthToken(token);
       const res = await api.post(`/parishes/${parishId}/history`, { entry_type: type, description });
       const h = res.data;
-      setHistory((prev) => [{ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone }, ...prev]);
+      setHistory((prev) => [{ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name }, ...prev]);
     } catch { /* silent */ }
   }, [parishId, getAccessTokenSilently]);
 
@@ -194,7 +194,7 @@ export default function DashboardPage() {
       const t = res.data;
       setTodos((prev) => prev.map((x) => x.id === id ? { id: t.id, text: t.text, building: t.building, priority: t.priority, prevPriority: t.prev_priority, done: t.done, createdAt: t.created_at } : x));
       const hRes = await api.get(`/parishes/${parishId}/history`);
-      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone })));
+      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
     } catch (err) { console.error(err); }
   };
 
@@ -210,7 +210,7 @@ export default function DashboardPage() {
       setTodos((p) => [...p, { id: t.id, text: t.text, building: t.building, priority: t.priority, prevPriority: t.prev_priority, done: t.done, createdAt: t.created_at }]);
       // Refresh history
       const hRes = await api.get(`/parishes/${parishId}/history`);
-      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone })));
+      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
       setNewTaskText(""); setNewTaskBuilding(""); setNewTaskPriority("green"); setShowAddTask(false);
     } catch (err) { console.error(err); }
   };
@@ -225,7 +225,7 @@ export default function DashboardPage() {
       const t = res.data;
       setTodos((prev) => prev.map((x) => x.id === id ? { id: t.id, text: t.text, building: t.building, priority: t.priority, prevPriority: t.prev_priority, done: t.done, createdAt: t.created_at } : x));
       const hRes = await api.get(`/parishes/${parishId}/history`);
-      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone })));
+      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
       setEditingTaskId(null);
       showToast("Task updated");
     } catch (err) { console.error(err); showToast("Failed to update task", "error"); }
@@ -238,7 +238,7 @@ export default function DashboardPage() {
       await api.delete(`/parishes/${parishId}/todos/${id}`);
       setTodos((p) => p.filter((x) => x.id !== id));
       const hRes = await api.get(`/parishes/${parishId}/history`);
-      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone })));
+      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
     } catch (err) { console.error(err); }
   };
 
@@ -316,7 +316,7 @@ export default function DashboardPage() {
       ]);
       setUtilities(uRes.data);
       setAppraisals(aRes.data);
-      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone })));
+      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
       setUploadMsg(`${successCount}/${stagedFiles.length} files uploaded successfully`);
       setStagedFiles([]);
     } catch (err: any) {
@@ -420,6 +420,16 @@ export default function DashboardPage() {
       showToast("Appraisal deleted");
       refreshData();
     } catch (err) { console.error(err); showToast("Failed to delete", "error"); }
+  };
+
+  const editAppraisal = async (appraisalId: number, updates: Record<string, any>) => {
+    try {
+      const token = await getAccessTokenSilently();
+      setAuthToken(token);
+      await api.put(`/data/appraisal/${appraisalId}`, updates);
+      showToast("Appraisal updated");
+      refreshData();
+    } catch (err) { console.error(err); showToast("Failed to update", "error"); }
   };
 
   // Map of original_filename to list of bill/appraisal IDs for bulk removal
@@ -795,9 +805,9 @@ export default function DashboardPage() {
             setEditTaskText={setEditTaskText} setEditTaskPriority={setEditTaskPriority} setEditTaskBuilding={setEditTaskBuilding} deleteTask={deleteTask}
           />}
           {activeTab === "utility" && <UtilityTab utilities={utilities} utilBuildings={utilBuildings} utilBuildingData={utilBuildingData} allMonths={allMonths} buildings={buildings} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} setBuildings={setBuildings} refreshData={refreshData} editUtilityBill={editUtilityBill} deleteUtilityBill={deleteUtilityBill} showToast={showToast} />}
-          {activeTab === "valuations" && <ValuationsTab buildingVals={buildingVals} totalVal={totalVal} totalValPct={totalValPct} appraisals={appraisals} buildings={buildings} />}
+          {activeTab === "valuations" && <ValuationsTab buildingVals={buildingVals} totalVal={totalVal} totalValPct={totalValPct} appraisals={appraisals} buildings={buildings} editAppraisal={editAppraisal} />}
           {activeTab === "finances" && <FinancesTab utilities={utilities} estMonthly={estMonthly} bldgFinances={bldgFinances} todos={todos} />}
-          {activeTab === "history" && <HistoryTab historyByMonth={historyByMonth} historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} history={history} uploadedDocs={uploadedDocs} removeUploadedDoc={removeUploadedDoc} showToast={showToast} utilities={utilities} appraisals={appraisals} editUtilityBill={editUtilityBill} deleteUtilityBill={deleteUtilityBill} refreshData={refreshData} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} />}
+          {activeTab === "history" && <HistoryTab historyByMonth={historyByMonth} historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} history={history} uploadedDocs={uploadedDocs} removeUploadedDoc={removeUploadedDoc} showToast={showToast} utilities={utilities} appraisals={appraisals} editUtilityBill={editUtilityBill} deleteUtilityBill={deleteUtilityBill} editAppraisal={editAppraisal} refreshData={refreshData} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} />}
         </div>
       </div>
 
@@ -996,6 +1006,7 @@ function UtilityTab({ utilities, utilBuildings, utilBuildingData, allMonths, bui
   const [editingAcct, setEditingAcct] = useState<{ buildingId: number; utilType: string; value: string } | null>(null);
   const [editingBill, setEditingBill] = useState<{ id: number; field: string; value: string } | null>(null);
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(null);
+  const [acctPanelOpen, setAcctPanelOpen] = useState(true);
 
   const unassignedAccounts = useMemo(() => {
     const accts = new Map<string, { account_number: string; utility_type: string; count: number }>();
@@ -1074,8 +1085,18 @@ function UtilityTab({ utilities, utilBuildings, utilBuildingData, allMonths, bui
   return (
     <div className="space-y-6">
       {/* ═══ Amber panel: account management ═══ */}
-      <div className="bg-amber-50 rounded-xl border border-amber-200 p-5 space-y-3">
-        <h3 className="text-sm font-semibold text-amber-800" style={{ fontFamily: "'Fraunces', serif" }}>Account Management</h3>
+      <div className="bg-amber-50 rounded-xl border border-amber-200 overflow-hidden">
+        <button onClick={() => setAcctPanelOpen(!acctPanelOpen)}
+          className="w-full px-5 py-4 flex items-center justify-between text-left">
+          <h3 className="text-sm font-semibold text-amber-800" style={{ fontFamily: "'Fraunces', serif" }}>Account Management</h3>
+          <div className="flex items-center gap-2">
+            {unassignedAccounts.length > 0 && <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded-full">{unassignedAccounts.length} unassigned</span>}
+            <span className="text-xs text-amber-600">{acctPanelOpen ? "▴" : "▾"}</span>
+          </div>
+        </button>
+
+        {acctPanelOpen && (
+        <div className="px-5 pb-5 space-y-3">
 
         {/* Unassigned accounts */}
         {unassignedAccounts.length > 0 && (
@@ -1192,6 +1213,8 @@ function UtilityTab({ utilities, utilBuildings, utilBuildingData, allMonths, bui
             <p className="text-xs text-stone-400">No bills assigned yet. Use the dropdown on unassigned accounts to assign bills here.</p>
           )}
         </div>
+        </div>
+        )}
       </div>
 
       {/* ═══ Per-building/account charts ═══ */}
@@ -1290,8 +1313,9 @@ function UtilityTab({ utilities, utilBuildings, utilBuildingData, allMonths, bui
 // Tab: Valuations
 // ══════════════════════════════════════════
 
-function ValuationsTab({ buildingVals, totalVal, totalValPct, appraisals, buildings }: any) {
+function ValuationsTab({ buildingVals, totalVal, totalValPct, appraisals, buildings, editAppraisal }: any) {
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(null);
+  const [editingVal, setEditingVal] = useState<{ id: number; building: string; field: string; value: string } | null>(null);
 
   const latest = appraisals.length ? appraisals[appraisals.length - 1] : null;
   const expiration = latest?.expiration_date;
@@ -1418,22 +1442,52 @@ function ValuationsTab({ buildingVals, totalVal, totalValPct, appraisals, buildi
               )}
             </div>
 
-            {/* Expanded history */}
+            {/* Expanded history — editable */}
             {isExpanded && history.length > 0 && (
               <div className="border-t border-stone-100">
                 <div className="px-5 py-2 bg-stone-50 text-xs text-stone-500 grid grid-cols-5 gap-2 font-medium">
                   <span>Date</span><span>Value</span><span>Sq Ft</span><span>$/sqft</span><span>Source</span>
                 </div>
                 <div className="divide-y divide-stone-50">
-                  {history.map((h, idx) => (
+                  {history.map((h, idx) => {
+                    const isEditingThis = (f: string) => editingVal?.id === h.id && editingVal?.building === bv.name && editingVal?.field === f;
+                    const startEdit = (f: string, v: string) => setEditingVal({ id: h.id, building: bv.name, field: f, value: v });
+                    const saveEdit = () => {
+                      if (editingVal) {
+                        editAppraisal(editingVal.id, { building_name: editingVal.building, [editingVal.field]: editingVal.value });
+                        setEditingVal(null);
+                      }
+                    };
+                    return (
                     <div key={`${h.id}-${idx}`} className={`px-5 py-2.5 grid grid-cols-5 gap-2 items-center text-xs ${idx === 0 ? "bg-blue-50/50" : ""}`}>
                       <span className="text-stone-700 font-medium">{h.date ? fmtDate(h.date) : "—"}{idx === 0 && <span className="ml-1 text-blue-600 text-[10px]">Latest</span>}</span>
-                      <span className="text-stone-700 tabular-nums font-medium">{money(h.value)}</span>
-                      <span className="text-stone-500 tabular-nums">{h.sqft > 0 ? h.sqft.toLocaleString() : "—"}</span>
+                      {isEditingThis("building_value") ? (
+                        <div className="flex items-center gap-1">
+                          <input value={editingVal!.value} onChange={(e) => setEditingVal({ ...editingVal!, value: e.target.value })}
+                            autoFocus onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditingVal(null); }}
+                            className="border border-stone-300 rounded px-1.5 py-0.5 text-xs w-full font-mono" />
+                          <button onClick={saveEdit} className="text-emerald-600 text-xs">✓</button>
+                        </div>
+                      ) : (
+                        <span onClick={() => startEdit("building_value", String(h.value || ""))}
+                          className="text-stone-700 tabular-nums font-medium cursor-pointer hover:text-blue-600 hover:underline">{money(h.value)}</span>
+                      )}
+                      {isEditingThis("gross_sq_ft") ? (
+                        <div className="flex items-center gap-1">
+                          <input value={editingVal!.value} onChange={(e) => setEditingVal({ ...editingVal!, value: e.target.value })}
+                            autoFocus onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditingVal(null); }}
+                            className="border border-stone-300 rounded px-1.5 py-0.5 text-xs w-full font-mono" />
+                          <button onClick={saveEdit} className="text-emerald-600 text-xs">✓</button>
+                        </div>
+                      ) : (
+                        <span onClick={() => startEdit("gross_sq_ft", String(h.sqft || ""))}
+                          className="text-stone-500 tabular-nums cursor-pointer hover:text-blue-600 hover:underline">{h.sqft > 0 ? h.sqft.toLocaleString() : "—"}</span>
+                      )}
                       <span className="text-stone-500 tabular-nums">{h.perSqft > 0 ? money(h.perSqft) : "—"}</span>
                       <span className="text-stone-400 truncate" title={h.filename}>{h.filename}</span>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1491,7 +1545,7 @@ function FinancesTab({ utilities, estMonthly, bldgFinances, todos }: any) {
 
 const HTYPE = { upload: { label: "Upload", dot: "bg-blue-400", badge: "bg-blue-50 text-blue-700" }, task_added: { label: "Added", dot: "bg-stone-400", badge: "bg-stone-100 text-stone-600" }, task_changed: { label: "Changed", dot: "bg-amber-400", badge: "bg-amber-50 text-amber-700" }, task_addressed: { label: "Addressed", dot: "bg-emerald-400", badge: "bg-emerald-50 text-emerald-700" } };
 
-function HistoryTab({ historyByMonth, historyFilter, setHistoryFilter, history, uploadedDocs, removeUploadedDoc, showToast, utilities, appraisals, editUtilityBill, deleteUtilityBill, refreshData, parishId, getAccessTokenSilently }: any) {
+function HistoryTab({ historyByMonth, historyFilter, setHistoryFilter, history, uploadedDocs, removeUploadedDoc, showToast, utilities, appraisals, editUtilityBill, deleteUtilityBill, editAppraisal, refreshData, parishId, getAccessTokenSilently }: any) {
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [expandedEntry, setExpandedEntry] = useState<number | null>(null);
   const [editingField, setEditingField] = useState<{ billId: number; field: string; value: string } | null>(null);
@@ -1538,7 +1592,10 @@ function HistoryTab({ historyByMonth, historyFilter, setHistoryFilter, history, 
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm ${isRemoved ? "text-stone-400 line-through" : "text-stone-700"}`}>{e.description}</p>
-                        <p className="text-xs text-stone-400 mt-0.5">{fmtDate(e.date)} at {fmtTime(e.date)}</p>
+                        <p className="text-xs text-stone-400 mt-0.5">
+                          {fmtDate(e.date)} at {fmtTime(e.date)}
+                          {e.user_name && <span className="text-blue-500 ml-1.5">by {e.user_name}</span>}
+                        </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {isRemoved && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-400">Removed</span>}
@@ -1601,12 +1658,20 @@ function HistoryTab({ historyByMonth, historyFilter, setHistoryFilter, history, 
                           </div>
                           <div className="divide-y divide-stone-50">
                             {records.appraisalEntries.map((a: any, idx: number) => (
-                              <div key={`${a.id}-${idx}`} className="px-4 py-2 grid grid-cols-5 gap-2 items-center text-xs">
+                              <div key={`${a.id}-${idx}`} className="px-4 py-2 grid grid-cols-5 gap-2 items-center text-xs hover:bg-stone-50 group">
                                 <span className="text-stone-700 font-medium">{a.building_name || "—"}</span>
-                                <span className="text-stone-700 tabular-nums">{a.building_value ? money(a.building_value) : "—"}</span>
-                                <span className="text-stone-500 tabular-nums">{a.gross_sq_ft ? Number(a.gross_sq_ft).toLocaleString() : "—"}</span>
-                                <span className="text-stone-500">{a.appraisal_date ? fmtDate(a.appraisal_date) : "—"}</span>
-                                <span className="text-stone-500 truncate">{a.appraiser_firm || "—"}</span>
+                                <InlineEdit value={a.building_value ? `$${Number(a.building_value).toLocaleString()}` : "—"} rawValue={a.building_value}
+                                  field="building_value" billId={a.id} type="number" editing={editingField} setEditing={setEditingField}
+                                  onSave={(id: number, updates: any) => editAppraisal(id, { building_name: a.building_name, ...updates })} />
+                                <InlineEdit value={a.gross_sq_ft ? Number(a.gross_sq_ft).toLocaleString() : "—"} rawValue={a.gross_sq_ft}
+                                  field="gross_sq_ft" billId={a.id} type="number" editing={editingField} setEditing={setEditingField}
+                                  onSave={(id: number, updates: any) => editAppraisal(id, { building_name: a.building_name, ...updates })} />
+                                <InlineEdit value={a.appraisal_date || "—"} field="appraisal_date" billId={a.id} type="date"
+                                  editing={editingField} setEditing={setEditingField}
+                                  onSave={(id: number, updates: any) => editAppraisal(id, updates)} />
+                                <InlineEdit value={a.appraiser_firm || "—"} field="appraiser_firm" billId={a.id} type="text"
+                                  editing={editingField} setEditing={setEditingField}
+                                  onSave={(id: number, updates: any) => editAppraisal(id, updates)} />
                               </div>
                             ))}
                           </div>

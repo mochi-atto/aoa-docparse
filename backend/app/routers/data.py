@@ -194,6 +194,95 @@ def get_appraisal_data(parish_id: int, db: Session = Depends(get_db), user=Depen
     return results
 
 
+@router.put("/appraisal/{appraisal_id}")
+def update_appraisal(appraisal_id: int, data: dict, db: Session = Depends(get_db), user=Depends(verify_token)):
+    """Edit an appraisal record. Updates both the DB record and the raw_extracted sections."""
+    from datetime import date as date_type
+
+    record = db.query(Appraisal).filter(Appraisal.id == appraisal_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Appraisal not found")
+
+    changes = []
+
+    # Document-level fields
+    for field in ["entity_name", "property_address", "appraiser_firm"]:
+        if field in data and data[field] is not None:
+            old = getattr(record, field)
+            setattr(record, field, str(data[field]).strip())
+            if str(old) != str(data[field]).strip():
+                changes.append(f"{field}: {old} → {data[field]}")
+
+    if "appraisal_date" in data and data["appraisal_date"]:
+        old = record.appraisal_date
+        try:
+            new_val = date_type.fromisoformat(str(data["appraisal_date"]))
+            record.appraisal_date = new_val
+            if old != new_val:
+                changes.append(f"appraisal_date: {old} → {new_val}")
+        except ValueError:
+            pass
+
+    # Per-building fields — update raw_extracted.sections and building_breakdown
+    if "building_name" in data or "building_value" in data or "gross_sq_ft" in data:
+        # These edits apply to a specific building within this appraisal
+        # The frontend sends: building_name (to identify), plus any changed fields
+        bldg_name = data.get("building_name")
+        raw = record.raw_extracted or {}
+        sections = raw.get("sections", [])
+        breakdown = record.building_breakdown or []
+
+        for sec in sections:
+            if sec.get("building_name") == bldg_name:
+                if "building_value" in data:
+                    old_val = sec.get("building_value")
+                    sec["building_value"] = data["building_value"]
+                    sec["total_valuation"] = data["building_value"]
+                    if str(old_val) != str(data["building_value"]):
+                        changes.append(f"{bldg_name} value: {old_val} → {data['building_value']}")
+                if "gross_sq_ft" in data:
+                    old_sqft = sec.get("gross_sq_ft")
+                    sec["gross_sq_ft"] = data["gross_sq_ft"]
+                    if str(old_sqft) != str(data["gross_sq_ft"]):
+                        changes.append(f"{bldg_name} sqft: {old_sqft} → {data['gross_sq_ft']}")
+                if "valuation_number" in data:
+                    sec["valuation_number"] = data["valuation_number"]
+                break
+
+        for bd in breakdown:
+            if bd.get("name") == bldg_name:
+                if "building_value" in data:
+                    bd["cost_of_reproduction_new"] = _to_float(data["building_value"])
+                if "gross_sq_ft" in data:
+                    bd["gross_sq_ft"] = _to_float(data["gross_sq_ft"])
+                break
+
+        raw["sections"] = sections
+        record.raw_extracted = raw
+        record.building_breakdown = breakdown
+        # Force SQLAlchemy to detect the change on JSON columns
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(record, "raw_extracted")
+        flag_modified(record, "building_breakdown")
+
+    if "expiration_date" in data:
+        raw = record.raw_extracted or {}
+        old_exp = raw.get("expiration_date")
+        raw["expiration_date"] = data["expiration_date"]
+        record.raw_extracted = raw
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(record, "raw_extracted")
+        if str(old_exp) != str(data["expiration_date"]):
+            changes.append(f"expiration: {old_exp} → {data['expiration_date']}")
+
+    if changes:
+        desc = f"Edited appraisal ({record.entity_name or 'Unknown'}): {'; '.join(changes)}"
+        db.add(HistoryEntry(parish_id=record.parish_id, entry_type="task_changed", description=desc))
+
+    db.commit()
+    return {"detail": "Appraisal updated", "changes": changes}
+
+
 @router.delete("/appraisal/{appraisal_id}")
 def delete_appraisal(appraisal_id: int, db: Session = Depends(get_db), user=Depends(verify_token)):
     record = db.query(Appraisal).filter(Appraisal.id == appraisal_id).first()
