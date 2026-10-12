@@ -13,6 +13,7 @@ class WorkOrder(Base):
     display_number = Column(String, nullable=False)
 
     building_id = Column(Integer, ForeignKey("buildings.id", ondelete="SET NULL"), nullable=True)
+    todo_id = Column(Integer, ForeignKey("todos.id", ondelete="SET NULL"), nullable=True)  # backlog item this addresses
 
     title = Column(String, nullable=False)
     description = Column(String, nullable=True)

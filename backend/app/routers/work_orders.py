@@ -7,6 +7,8 @@ import datetime
 from app.database import get_db
 from app.models.work_order import WorkOrder
 from app.models.building import Building
+from app.models.todo import Todo
+from app.models.user_profile import UserProfile
 from app.models.history_entry import HistoryEntry
 from app.permissions import CurrentUser, get_current_user, require
 
@@ -27,6 +29,7 @@ class WorkOrderCreate(BaseModel):
     priority: str = "medium"
     due_date: Optional[datetime.date] = None
     building_id: Optional[int] = None
+    todo_id: Optional[int] = None
     requester_name: Optional[str] = None
 
 class WorkOrderResponse(BaseModel):
@@ -34,6 +37,7 @@ class WorkOrderResponse(BaseModel):
     parish_id: int
     display_number: str
     building_id: Optional[int]
+    todo_id: Optional[int]
 
     title: str
     description: Optional[str]
@@ -98,6 +102,15 @@ def create_work_order(
         if building is None:
             raise HTTPException(status_code=400, detail="Invalid building_id for this parish")
 
+    if data.todo_id is not None:
+        todo = (
+            db.query(Todo)
+            .filter(Todo.id == data.todo_id, Todo.parish_id == parish_id)
+            .first()
+        )
+        if todo is None:
+            raise HTTPException(status_code=400, detail="Invalid todo_id for this parish")
+
     if data.due_date is not None:
         due_date = data.due_date
     else:
@@ -107,7 +120,11 @@ def create_work_order(
     existing_count = db.query(WorkOrder).filter(WorkOrder.parish_id == parish_id).count()
     display_number = f"WO-{existing_count + 1:04d}" # WO-0001, WO-0002, etc.
 
-    if user.name:
+    # Prefer the user's saved display name, then the token's name, then what the client sent
+    profile = db.query(UserProfile).filter(UserProfile.sub == user.sub).first()
+    if profile and profile.display_name:
+        requester_name = profile.display_name
+    elif user.name:
         requester_name = user.name
     else:
         requester_name = data.requester_name
@@ -116,6 +133,7 @@ def create_work_order(
         parish_id=parish_id,
         display_number=display_number,
         building_id=data.building_id,
+        todo_id=data.todo_id,
         title=title,
         description=data.description,
         priority=data.priority,
