@@ -11,6 +11,9 @@ alembic==1.13.1
 llama-index==0.11.0
 llama-index-llms-openai==0.2.0
 openai==1.40.0
+pymupdf==1.24.9
+pytesseract==0.3.13
+pillow==10.4.0
 
 # Appraisal bill parsing (local only)
 pdfplumber==0.11.2
