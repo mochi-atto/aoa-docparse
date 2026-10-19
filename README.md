@@ -78,15 +78,23 @@ parish-document-parser/
 
 ### Parish roles
 
-Authentication uses two local roles. The first person to authenticate without a
-pending invitation is automatically an administrator. Administrators can manage
-parish data and use **Add Viewer** on a parish dashboard to invite a viewer by
-email. The invitation link must be used with the invited email address.
-Viewers can read parish information but all data mutations are rejected by the
-API.
+Parish membership determines access: **Admin** manages parish data and members,
+**Editor / Technician** creates and updates maintenance tasks, and **Viewer** has
+read-only access. A user's role can differ between parishes. The last active
+administrator cannot be removed or demoted.
 
-Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
-`SMTP_FROM`, and `FRONTEND_URL` in `backend/.env` to enable invitation email.
+Administrators open **Manage Members** on the dashboard to list members, change
+roles, remove access, or generate an invitation for an editor or viewer. When
+`FRONTEND_URL` points to localhost and SMTP is unavailable, a copyable invitation
+link is returned to the administrator; no email is claimed to have been sent.
+On production URLs, SMTP must be configured. Configure `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, and `FRONTEND_URL` for email delivery.
+Recipients sign in with Auth0 using the invited email and click **Accept
+Invitation**. Tokens are single-use and are never returned by member lists.
+
+Run permission regression tests from `backend` with:
+`python -m unittest discover -s tests -p test_rbac.py -v`.
+These tests use an isolated in-memory database and never reset PostgreSQL.
 
 ### Prerequisites
 

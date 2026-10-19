@@ -1,4 +1,3 @@
-import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 

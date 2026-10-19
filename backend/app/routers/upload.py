@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.auth import parish_admin_access
+from app.auth import parish_admin_access, parish_access, current_account
 from app.schemas.documents import UploadResponse
 from app.parsers.utility_parser import parse_utility_bill
 from app.parsers.appraisal_parser import parse_appraisal
@@ -22,6 +22,10 @@ def _serialize_for_json(data: dict) -> dict:
     return result
 
 
+def upload_admin_access(parish_id: int = Form(...), account=Depends(current_account), db: Session = Depends(get_db)):
+    return parish_admin_access(parish_access(parish_id, account, db))
+
+
 @router.post("/", response_model=UploadResponse)
 async def upload_document(
     file: UploadFile = File(...),
@@ -29,7 +33,7 @@ async def upload_document(
     doc_type: str = Form(...),  # "utility" or "appraisal"
     extracted_text: str | None = Form(None),
     db: Session = Depends(get_db),
-    membership=Depends(parish_admin_access),
+    membership=Depends(upload_admin_access),
 ):
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted")

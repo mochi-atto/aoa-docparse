@@ -15,9 +15,15 @@ router = APIRouter()
 
 @router.get("/", response_model=List[ParishResponse])
 def list_parishes(db: Session = Depends(get_db), account=Depends(current_account)):
-    return db.query(Parish).join(Parish.members).filter(
-        Parish.members.any(account_id=account.id)
-    ).all()
+    from app.models.parish_member import ParishMember
+    rows = db.query(Parish, ParishMember.role).join(Parish.members).filter(
+        ParishMember.account_id == account.id).all()
+    result = []
+    for parish, role in rows:
+        response = ParishResponse.model_validate(parish)
+        response.role = role
+        result.append(response)
+    return result
 
 
 @router.post("/", response_model=ParishResponse)

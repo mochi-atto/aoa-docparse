@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.auth import parish_access, parish_admin_access
+from app.auth import parish_access, parish_admin_access, parish_editor_access
 from app.models.todo import Todo
 from app.models.history_entry import HistoryEntry
 from pydantic import BaseModel
@@ -58,7 +58,7 @@ def list_todos(parish_id: int, db: Session = Depends(get_db), membership=Depends
 
 
 @router.post("/{parish_id}/todos", response_model=TodoResponse)
-def create_todo(parish_id: int, data: TodoCreate, db: Session = Depends(get_db), membership=Depends(parish_admin_access)):
+def create_todo(parish_id: int, data: TodoCreate, db: Session = Depends(get_db), membership=Depends(parish_editor_access)):
     todo = Todo(parish_id=parish_id, text=data.text, building=data.building, priority=data.priority)
     db.add(todo)
     entry = HistoryEntry(parish_id=parish_id, entry_type="task_added", description=f'Task added: "{data.text}" for {data.building}')
@@ -69,7 +69,7 @@ def create_todo(parish_id: int, data: TodoCreate, db: Session = Depends(get_db),
 
 
 @router.put("/{parish_id}/todos/{todo_id}", response_model=TodoResponse)
-def update_todo(parish_id: int, todo_id: int, data: TodoUpdate, db: Session = Depends(get_db), membership=Depends(parish_admin_access)):
+def update_todo(parish_id: int, todo_id: int, data: TodoUpdate, db: Session = Depends(get_db), membership=Depends(parish_editor_access)):
     todo = db.query(Todo).filter(Todo.id == todo_id, Todo.parish_id == parish_id).first()
     if not todo:
         raise HTTPException(status_code=404, detail="Todo not found")

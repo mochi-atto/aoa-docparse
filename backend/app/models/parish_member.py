@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, UniqueConstraint
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 from app.database import Base
 import datetime
 
@@ -18,3 +18,9 @@ class ParishMember(Base):
 
     parish = relationship("Parish", back_populates="members")
     account = relationship("Account", back_populates="memberships")
+
+    @validates("role")
+    def validate_role(self, key, value):
+        if value not in {"admin", "editor", "viewer"}:
+            raise ValueError("Role must be admin, editor, or viewer")
+        return value

@@ -1,10 +1,12 @@
 import { useAuth0 } from "@auth0/auth0-react";
-import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback, createContext, useContext } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import api, { setAuthToken } from "../services/api";
+import ManageMembersModal from "../components/ManageMembersModal";
+import { memberApi, type ParishRole } from "../services/api";
 import { extractUtilityText } from "../services/browserOcr";
 
 // ══════════════════════════════════════════
@@ -71,6 +73,8 @@ const bldgName = (u: any): string => u.building_name || u.service_address || (u.
 // Component
 // ══════════════════════════════════════════
 
+const ParishAdminContext = createContext(false);
+
 export default function DashboardPage() {
   const { parishId } = useParams<{ parishId: string }>();
   const navigate = useNavigate();
@@ -81,7 +85,7 @@ export default function DashboardPage() {
   const [utilities, setUtilities] = useState<UtilityBill[]>([]);
   const [appraisals, setAppraisals] = useState<Appraisal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [templates, setTemplates] = useState<any[]>([]);
+  const [, setTemplates] = useState<any[]>([]);
   const [buildings, setBuildings] = useState<BuildingData[]>([]);
 
   // UI
@@ -103,11 +107,10 @@ export default function DashboardPage() {
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [parishImage, setParishImage] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [showViewerInvite, setShowViewerInvite] = useState(false);
-  const [viewerEmail, setViewerEmail] = useState("");
-  const [viewerMessage, setViewerMessage] = useState("");
-  const [viewers, setViewers] = useState<{ id: number; email: string }[]>([]);
+  const [parishRole, setParishRole] = useState<ParishRole>("viewer");
+  const isAdmin = parishRole === "admin";
+  const canEditTasks = isAdmin || parishRole === "editor";
+  const [showMembers, setShowMembers] = useState(false);
 
   // Add task form (used from dashboard + risks tab)
   const [showAddTask, setShowAddTask] = useState(false);
@@ -150,8 +153,8 @@ export default function DashboardPage() {
     try {
       const token = await getAccessTokenSilently();
       setAuthToken(token);
-      const accountRes = await api.get("/account/me");
-      setIsAdmin(accountRes.data.role === "admin");
+      const roleRes = await memberApi.me(parishId!);
+      setParishRole(roleRes.data.role);
       const [pRes, uRes, aRes, tRes, todoRes, histRes] = await Promise.all([
         api.get(`/parishes/${parishId}`),
         api.get(`/data/utility/${parishId}`),
@@ -174,34 +177,12 @@ export default function DashboardPage() {
       setHistory(histRes.data.map((h: any) => ({
         id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name,
       })));
-      if (accountRes.data.role === "admin") {
-        const viewersRes = await api.get(`/account/parishes/${parishId}/viewers`);
-        setViewers(viewersRes.data);
-      }
+
     } catch (err) { console.error("Dashboard load error:", err); }
     finally { setLoading(false); }
   }, [parishId, getAccessTokenSilently]);
 
   useEffect(() => { refreshData(); }, [refreshData]);
-
-  const inviteViewer = async () => {
-    try {
-      const token = await getAccessTokenSilently();
-      setAuthToken(token);
-      await api.post(`/account/parishes/${parishId}/viewers`, { email: viewerEmail });
-      setViewerEmail("");
-      setViewerMessage("Invitation sent.");
-      const response = await api.get(`/account/parishes/${parishId}/viewers`);
-      setViewers(response.data);
-    } catch (error: any) {
-      setViewerMessage(error?.response?.data?.detail || "Could not send invitation.");
-    }
-  };
-
-  const removeViewer = async (id: number) => {
-    await api.delete(`/account/parishes/${parishId}/viewers/${id}`);
-    setViewers((current) => current.filter((viewer) => viewer.id !== id));
-  };
 
   // ── History helper (API-backed) ──
   const addHistory = useCallback(async (type: string, description: string) => {
@@ -216,6 +197,7 @@ export default function DashboardPage() {
 
   // ── Todo handlers (API-backed) ──
   const toggleTodo = async (id: number) => {
+    if (!canEditTasks) return;
     const todo = todos.find((t) => t.id === id);
     if (!todo) return;
     try {
@@ -226,10 +208,11 @@ export default function DashboardPage() {
       setTodos((prev) => prev.map((x) => x.id === id ? { id: t.id, text: t.text, building: t.building, priority: t.priority, prevPriority: t.prev_priority, done: t.done, createdAt: t.created_at } : x));
       const hRes = await api.get(`/parishes/${parishId}/history`);
       setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
-    } catch (err) { console.error(err); }
+    } catch (err: any) { console.error(err); showToast(err?.response?.data?.detail || "Could not save changes", "error"); }
   };
 
   const addTask = async () => {
+    if (!canEditTasks) return;
     if (!newTaskText.trim() || !newTaskBuilding.trim()) return;
     try {
       const token = await getAccessTokenSilently();
@@ -243,12 +226,13 @@ export default function DashboardPage() {
       const hRes = await api.get(`/parishes/${parishId}/history`);
       setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
       setNewTaskText(""); setNewTaskBuilding(""); setNewTaskPriority("green"); setShowAddTask(false);
-    } catch (err) { console.error(err); }
+    } catch (err: any) { console.error(err); showToast(err?.response?.data?.detail || "Could not save changes", "error"); }
   };
 
   const startEditTask = (t: TodoItem) => { setEditingTaskId(t.id); setEditTaskText(t.text); setEditTaskPriority(t.priority); setEditTaskBuilding(t.building); };
 
   const saveEditTask = async (id: number) => {
+    if (!canEditTasks) return;
     try {
       const token = await getAccessTokenSilently();
       setAuthToken(token);
@@ -263,6 +247,7 @@ export default function DashboardPage() {
   };
 
   const deleteTask = async (id: number) => {
+    if (!isAdmin || !window.confirm("Delete this maintenance task?")) return;
     try {
       const token = await getAccessTokenSilently();
       setAuthToken(token);
@@ -270,7 +255,7 @@ export default function DashboardPage() {
       setTodos((p) => p.filter((x) => x.id !== id));
       const hRes = await api.get(`/parishes/${parishId}/history`);
       setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
-    } catch (err) { console.error(err); }
+    } catch (err: any) { console.error(err); showToast(err?.response?.data?.detail || "Could not save changes", "error"); }
   };
 
   // ── Upload handlers ──
@@ -449,15 +434,6 @@ export default function DashboardPage() {
     } catch (err) { console.error(err); showToast("Failed to delete bill", "error"); }
   };
 
-  const deleteAppraisalDoc = async (appraisalId: number) => {
-    try {
-      const token = await getAccessTokenSilently();
-      setAuthToken(token);
-      await api.delete(`/data/appraisal/${appraisalId}`);
-      showToast("Appraisal deleted");
-      refreshData();
-    } catch (err) { console.error(err); showToast("Failed to delete", "error"); }
-  };
 
   const editAppraisal = async (appraisalId: number, updates: Record<string, any>) => {
     try {
@@ -496,7 +472,7 @@ export default function DashboardPage() {
         else await api.delete(`/data/appraisal/${id}`);
       }
       refreshData();
-    } catch (err) { console.error(err); }
+    } catch (err: any) { console.error(err); showToast(err?.response?.data?.detail || "Could not save changes", "error"); }
   };
 
   // ══════════════════════════════════════════
@@ -610,7 +586,6 @@ export default function DashboardPage() {
   }, [history]);
 
   const todoBuildings = useMemo(() => [...new Set(todos.map((t) => t.building))].sort(), [todos]);
-  const hasTemplate = templates.some((t: any) => t.is_default);
 
   // ══════════════════════════════════════════
   // Render
@@ -635,6 +610,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-4">
             <button onClick={() => navigate("/parishes")} className="text-stone-400 hover:text-stone-600 text-sm transition-colors">← Parishes</button>
             <div className="w-px h-5 bg-stone-200" />
+            <span className="text-xs font-medium bg-stone-100 text-stone-600 px-2 py-1 rounded-full capitalize">{parishRole === "editor" ? "Editor / Technician" : parishRole}</span>
             <h1 className="text-lg font-semibold text-stone-800" style={{ fontFamily: "'Fraunces', serif" }}>Dashboard</h1>
           </div>
           <div className="relative" ref={menuRef}>
@@ -668,7 +644,7 @@ export default function DashboardPage() {
                 <div className="absolute inset-0 rounded-xl bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                   <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 </div>
-                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                <input disabled={!isAdmin} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
               </label>
               <div className="flex-1 min-w-0">
                 {editingName ? (
@@ -679,14 +655,14 @@ export default function DashboardPage() {
                     <button onClick={() => setEditingName(false)} className="text-stone-400 text-sm">Cancel</button>
                   </div>
                 ) : (
-                  <h2 onClick={() => { setEditingName(true); setNameInput(parish?.name || ""); }} className="text-xl font-bold text-stone-800 truncate cursor-pointer hover:text-stone-600 transition-colors" style={{ fontFamily: "'Fraunces', serif" }} title="Click to rename">
+                  <h2 onClick={() => { if (!isAdmin) return; setEditingName(true); setNameInput(parish?.name || ""); }} className="text-xl font-bold text-stone-800 truncate cursor-pointer hover:text-stone-600 transition-colors" style={{ fontFamily: "'Fraunces', serif" }} title="Click to rename">
                     {parish?.name || "Untitled Parish"}
                   </h2>
                 )}
                 <p className="text-sm text-stone-400 mt-0.5">{parish?.diocese}{parish?.address ? ` · ${parish.address}` : ""}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs text-stone-400">{buildings.length} building{buildings.length !== 1 ? "s" : ""}</span>
-                  <button onClick={() => setShowBuildingMgmt(!showBuildingMgmt)}
+                  <button disabled={!isAdmin} hidden={!isAdmin} onClick={() => setShowBuildingMgmt(!showBuildingMgmt)}
                     className="text-xs text-blue-600 hover:text-blue-700 font-medium">
                     {showBuildingMgmt ? "Close ▴" : "Manage ▾"}
                   </button>
@@ -699,7 +675,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Building management dropdown */}
-            {showBuildingMgmt && (
+            {isAdmin && showBuildingMgmt && (
               <div className="border-t border-stone-100 px-5 py-3 bg-stone-50/50">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-xs font-semibold text-stone-600">Buildings</h4>
@@ -748,7 +724,7 @@ export default function DashboardPage() {
 
             {/* Upload bar */}
             <div className="border-t border-stone-100 px-5 py-3 bg-stone-50/50">
-              {!isAdmin && <p className="text-xs text-stone-500 mb-2">Viewer access is read-only.</p>}
+              {!isAdmin && <p className="text-xs text-stone-500 mb-2">{parishRole === "editor" ? "Editor access: create and update maintenance tasks." : "Viewer access is read-only."}</p>}
               <div className="flex items-center gap-3">
                 <span className="text-xs text-stone-500">Upload:</span>
                 <div className="flex rounded-lg border border-stone-200 overflow-hidden">
@@ -764,9 +740,9 @@ export default function DashboardPage() {
                   <input ref={fileRef} type="file" accept=".pdf" multiple className="hidden" onChange={handleFilesSelected}
                     disabled={uploading} />
                 </label>}
-                {isAdmin && <button onClick={() => setShowViewerInvite(true)}
+                {isAdmin && <button onClick={() => setShowMembers(true)}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-white border border-stone-300 text-stone-700 hover:bg-stone-50">
-                  + Add Viewer
+                  Manage Members
                 </button>}
                 {isAdmin && stagedFiles.length > 0 && !uploading && (
                   <button onClick={parseAndUpload} className="bg-stone-800 hover:bg-stone-900 text-white px-4 py-1.5 rounded-lg text-xs font-medium transition-colors">
@@ -775,25 +751,6 @@ export default function DashboardPage() {
                 )}
                 {uploadMsg && <span className={`text-xs ${uploadMsg.includes("success") ? "text-emerald-600" : "text-red-500"}`}>{uploadMsg}</span>}
               </div>
-
-              {showViewerInvite && isAdmin && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-                <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
-                  <h2 className="text-lg font-semibold text-stone-800">Add Viewer</h2>
-                  <p className="text-sm text-stone-500 mt-1">Send a view-only invitation to this parish.</p>
-                  <input type="email" value={viewerEmail} onChange={(event) => setViewerEmail(event.target.value)}
-                    placeholder="viewer@example.com" className="w-full mt-4 border border-stone-300 rounded-lg px-3 py-2 text-sm" />
-                  <div className="mt-4 space-y-2">
-                    {viewers.map((viewer) => <div key={viewer.id} className="flex justify-between text-sm text-stone-600">
-                      <span>{viewer.email}</span><button onClick={() => removeViewer(viewer.id)} className="text-red-500">Delete</button>
-                    </div>)}
-                  </div>
-                  {viewerMessage && <p className="text-sm text-stone-500 mt-3">{viewerMessage}</p>}
-                  <div className="flex justify-end gap-2 mt-5">
-                    <button onClick={() => setShowViewerInvite(false)} className="text-sm text-stone-500 px-3 py-2">Close</button>
-                    <button onClick={inviteViewer} disabled={!viewerEmail.trim()} className="bg-stone-800 disabled:bg-stone-300 text-white rounded-lg px-3 py-2 text-sm">Send Invite</button>
-                  </div>
-                </div>
-              </div>}
 
               {/* Staged files list */}
               {(stagedFiles.length > 0 || Object.keys(uploadProgress).length > 0) && (
@@ -840,8 +797,9 @@ export default function DashboardPage() {
         </div>
 
         {/* ═══ Tab Content ═══ */}
+        <ParishAdminContext.Provider value={isAdmin}>
         <div className="max-w-7xl mx-auto px-6 py-4">
-          {activeTab === "dashboard" && <DashboardTab
+          {activeTab === "dashboard" && <DashboardTab canEditTasks={canEditTasks}
             utilities={utilities} appraisals={appraisals} todos={todos} history={history}
             utilMonthly={utilMonthly} allMonths={allMonths} buildingVals={buildingVals}
             totalVal={totalVal} totalValPct={totalValPct}
@@ -854,7 +812,7 @@ export default function DashboardPage() {
             newTaskPriority={newTaskPriority} setNewTaskPriority={setNewTaskPriority}
             addTask={addTask} buildings={buildings}
           />}
-          {activeTab === "risks" && <RisksTab
+          {activeTab === "risks" && <RisksTab canEditTasks={canEditTasks} canDeleteTasks={isAdmin}
             todos={todos} toggleTodo={toggleTodo} todoBuildings={todoBuildings}
             showAddTask={showAddTask} setShowAddTask={setShowAddTask}
             newTaskText={newTaskText} setNewTaskText={setNewTaskText}
@@ -870,8 +828,10 @@ export default function DashboardPage() {
           {activeTab === "finances" && <FinancesTab utilities={utilities} estMonthly={estMonthly} bldgFinances={bldgFinances} todos={todos} />}
           {activeTab === "history" && <HistoryTab historyByMonth={historyByMonth} historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} history={history} uploadedDocs={uploadedDocs} removeUploadedDoc={removeUploadedDoc} showToast={showToast} utilities={utilities} appraisals={appraisals} editUtilityBill={editUtilityBill} deleteUtilityBill={deleteUtilityBill} editAppraisal={editAppraisal} refreshData={refreshData} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} />}
         </div>
+        </ParishAdminContext.Provider>
       </div>
 
+      {showMembers && isAdmin && <ManageMembersModal parishId={parishId!} parishName={parish?.name || "Parish"} onClose={() => setShowMembers(false)} onChanged={refreshData} />}
       {/* Toast notification */}
       {toast && (
         <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border text-sm font-medium transition-all ${
@@ -891,7 +851,7 @@ export default function DashboardPage() {
 // Tab: Dashboard (overview)
 // ══════════════════════════════════════════
 
-function DashboardTab({ utilities, todos, utilMonthly, allMonths, buildingVals, totalVal, totalValPct, prioCounts, estMonthly, recentHistoryByMonth, toggleTodo, setActiveTab, showAddTask, setShowAddTask, newTaskText, setNewTaskText, newTaskBuilding, setNewTaskBuilding, newTaskPriority, setNewTaskPriority, addTask, buildings }: any) {
+function DashboardTab({ canEditTasks, utilities, todos, utilMonthly, allMonths, prioCounts, estMonthly, recentHistoryByMonth, toggleTodo, setActiveTab, showAddTask, setShowAddTask, newTaskText, setNewTaskText, newTaskBuilding, setNewTaskBuilding, newTaskPriority, setNewTaskPriority, addTask, buildings }: any) {
   return (
     <div className="grid gap-4" style={{ gridTemplateColumns: "2fr 1fr" }}>
       <div className="space-y-4">
@@ -905,12 +865,12 @@ function DashboardTab({ utilities, todos, utilMonthly, allMonths, buildingVals, 
                   <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY[p].dot}`} />{prioCounts[p]}
                 </span>
               ))}
-              <button onClick={() => setShowAddTask(true)} className="ml-2 text-xs text-stone-500 hover:text-stone-800 font-medium">+ Add</button>
+              <button hidden={!canEditTasks} onClick={() => setShowAddTask(true)} className="ml-2 text-xs text-stone-500 hover:text-stone-800 font-medium">+ Add</button>
             </div>
           </div>
 
           {/* Quick add form */}
-          {showAddTask && <AddTaskForm {...{ newTaskText, setNewTaskText, newTaskBuilding, setNewTaskBuilding, newTaskPriority, setNewTaskPriority, addTask, buildings, onCancel: () => setShowAddTask(false) }} />}
+          {canEditTasks && showAddTask && <AddTaskForm {...{ newTaskText, setNewTaskText, newTaskBuilding, setNewTaskBuilding, newTaskPriority, setNewTaskPriority, addTask, buildings, onCancel: () => setShowAddTask(false) }} />}
 
           {todos.length === 0 ? <Empty text="No active tasks yet." sub="Click + Add to create one." /> : (
             <div className="max-h-64 overflow-y-auto space-y-1 pr-1 -mr-1 custom-scroll">
@@ -918,7 +878,7 @@ function DashboardTab({ utilities, todos, utilMonthly, allMonths, buildingVals, 
                 const c = PRIORITY[todo.priority as keyof typeof PRIORITY];
                 return (
                   <div key={todo.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${c.border} ${c.bg}`}>
-                    <button onClick={() => toggleTodo(todo.id)} className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${todo.done ? "bg-sky-500 border-sky-500 text-white" : "border-stone-300 hover:border-stone-400"}`}>
+                    <button disabled={!canEditTasks} aria-label="Toggle task completion" onClick={() => toggleTodo(todo.id)} className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${todo.done ? "bg-sky-500 border-sky-500 text-white" : "border-stone-300 hover:border-stone-400"}`}>
                       {todo.done && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                     </button>
                     <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${c.dot}`} />
@@ -1002,15 +962,15 @@ function DashboardTab({ utilities, todos, utilMonthly, allMonths, buildingVals, 
 // Tab: Risks
 // ══════════════════════════════════════════
 
-function RisksTab({ todos, toggleTodo, todoBuildings, showAddTask, setShowAddTask, newTaskText, setNewTaskText, newTaskBuilding, setNewTaskBuilding, newTaskPriority, setNewTaskPriority, addTask, prioCounts, buildings, editingTaskId, editTaskText, editTaskPriority, editTaskBuilding, startEditTask, saveEditTask, setEditingTaskId, setEditTaskText, setEditTaskPriority, setEditTaskBuilding, deleteTask }: any) {
+function RisksTab({ canEditTasks, canDeleteTasks, todos, toggleTodo, todoBuildings, showAddTask, setShowAddTask, newTaskText, setNewTaskText, newTaskBuilding, setNewTaskBuilding, newTaskPriority, setNewTaskPriority, addTask, prioCounts, buildings, editingTaskId, editTaskText, editTaskPriority, editTaskBuilding, startEditTask, saveEditTask, setEditingTaskId, setEditTaskText, setEditTaskPriority, setEditTaskBuilding, deleteTask }: any) {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">{PRIO_ORDER.map((p) => (<span key={p} title={PRIORITY[p].desc} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium cursor-help ${PRIORITY[p].badge}`}><span className={`w-2 h-2 rounded-full ${PRIORITY[p].dot}`} />{prioCounts[p]} {PRIORITY[p].label}</span>))}</div>
-        <button onClick={() => setShowAddTask(true)} className="bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Add Task</button>
+        <button hidden={!canEditTasks} onClick={() => setShowAddTask(true)} className="bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Add Task</button>
       </div>
 
-      {showAddTask && <div className="mb-4"><AddTaskForm {...{ newTaskText, setNewTaskText, newTaskBuilding, setNewTaskBuilding, newTaskPriority, setNewTaskPriority, addTask, buildings, onCancel: () => setShowAddTask(false) }} /></div>}
+      {canEditTasks && showAddTask && <div className="mb-4"><AddTaskForm {...{ newTaskText, setNewTaskText, newTaskBuilding, setNewTaskBuilding, newTaskPriority, setNewTaskPriority, addTask, buildings, onCancel: () => setShowAddTask(false) }} /></div>}
 
       {todoBuildings.length === 0 && !showAddTask ? <div className="bg-white rounded-xl border border-stone-200 p-12 text-center"><p className="text-stone-400">No tasks yet.</p></div> : (
         <div className="space-y-4">{todoBuildings.map((building: string) => {
@@ -1025,7 +985,7 @@ function RisksTab({ todos, toggleTodo, todoBuildings, showAddTask, setShowAddTas
                 const c = PRIORITY[todo.priority as keyof typeof PRIORITY]; const isEditing = editingTaskId === todo.id;
                 return (
                   <div key={todo.id} className={`flex items-center gap-3 px-5 py-3 ${c.bg}`}>
-                    <button onClick={() => toggleTodo(todo.id)} className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center ${todo.done ? "bg-sky-500 border-sky-500 text-white" : "border-stone-300 hover:border-stone-400"}`}>{todo.done && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}</button>
+                    <button disabled={!canEditTasks} aria-label="Toggle task completion" onClick={() => toggleTodo(todo.id)} className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center ${todo.done ? "bg-sky-500 border-sky-500 text-white" : "border-stone-300 hover:border-stone-400"}`}>{todo.done && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}</button>
                     <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${c.dot}`} />
                     {isEditing ? (
                       <div className="flex-1 flex items-center gap-2 flex-wrap">
@@ -1044,8 +1004,8 @@ function RisksTab({ todos, toggleTodo, todoBuildings, showAddTask, setShowAddTas
                       <>
                         <span className={`flex-1 text-sm ${todo.done ? "line-through text-stone-400" : "text-stone-700"}`}>{todo.text}</span>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.badge}`}>{c.label}</span>
-                        <button onClick={() => startEditTask(todo)} className="text-stone-400 hover:text-stone-600 text-xs ml-1">Edit</button>
-                        <button onClick={() => deleteTask(todo.id)} className="text-stone-400 hover:text-red-500 text-xs">✕</button>
+                        <button hidden={!canEditTasks} onClick={() => startEditTask(todo)} className="text-stone-400 hover:text-stone-600 text-xs ml-1">Edit</button>
+                        <button hidden={!canDeleteTasks} aria-label="Delete task" onClick={() => deleteTask(todo.id)} className="text-stone-400 hover:text-red-500 text-xs">✕</button>
                       </>
                     )}
                   </div>
@@ -1064,6 +1024,7 @@ function RisksTab({ todos, toggleTodo, todoBuildings, showAddTask, setShowAddTas
 // ══════════════════════════════════════════
 
 function UtilityTab({ utilities, utilBuildings, utilBuildingData, allMonths, buildings, parishId, getAccessTokenSilently, setBuildings, refreshData, editUtilityBill, deleteUtilityBill, showToast }: any) {
+  const canManage = useContext(ParishAdminContext);
   const [editingAcct, setEditingAcct] = useState<{ buildingId: number; utilType: string; value: string } | null>(null);
   const [editingBill, setEditingBill] = useState<{ id: number; field: string; value: string } | null>(null);
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(null);
@@ -1169,7 +1130,7 @@ function UtilityTab({ utilities, utilBuildings, utilBuildingData, allMonths, bui
                 <span className="text-xs text-stone-400 capitalize">{ua.utility_type}</span>
                 <span className="text-xs text-stone-400">({ua.count} bills)</span>
                 <span className="text-xs text-stone-400 mx-1">→</span>
-                <select onChange={(e) => {
+                <select disabled={!canManage} onChange={(e) => {
                   const val = e.target.value;
                   if (val === "__general__") assignToGeneral(ua.account_number);
                   else if (val) saveAccountNumber(Number(val), ua.utility_type, ua.account_number);
@@ -1191,7 +1152,7 @@ function UtilityTab({ utilities, utilBuildings, utilBuildingData, allMonths, bui
             <div key={b.id} className="bg-white rounded-lg border border-stone-200 px-4 py-3">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm font-medium text-stone-700">{b.name}</p>
-                <select onChange={(e) => {
+                <select disabled={!canManage} onChange={(e) => {
                   if (e.target.value) { setEditingAcct({ buildingId: b.id, utilType: e.target.value, value: "" }); e.target.value = ""; }
                 }} className="border border-stone-300 rounded px-2 py-0.5 text-xs bg-white" defaultValue="">
                   <option value="">+ Add utility</option>
@@ -1213,15 +1174,15 @@ function UtilityTab({ utilities, utilBuildings, utilBuildingData, allMonths, bui
                             className="border border-stone-300 rounded px-1.5 py-0.5 text-xs w-24 font-mono" autoFocus
                             onKeyDown={(e) => { if (e.key === "Enter") saveAccountNumber(b.id, ut, editingAcct.value); if (e.key === "Escape") setEditingAcct(null); }} />
                           <button onClick={() => saveAccountNumber(b.id, ut, editingAcct.value)} className="text-emerald-600 text-xs">✓</button>
-                          <button onClick={() => setEditingAcct(null)} className="text-stone-400 text-xs">✕</button>
+                          <button disabled={!canManage} onClick={() => setEditingAcct(null)} className="text-stone-400 text-xs">✕</button>
                         </div>
                       ) : (
                         <>
-                          <button onClick={() => setEditingAcct({ buildingId: b.id, utilType: ut, value: acct || "" })}
+                          <button disabled={!canManage} onClick={() => setEditingAcct({ buildingId: b.id, utilType: ut, value: acct || "" })}
                             className="font-mono px-1 rounded bg-white border border-stone-200 text-stone-600 hover:border-stone-400">
                             {acct || "set #"}
                           </button>
-                          <button onClick={() => removeUtilFromBuilding(b.id, ut)}
+                          <button hidden={!canManage} onClick={() => removeUtilFromBuilding(b.id, ut)}
                             className="text-stone-300 hover:text-red-500 ml-0.5" title="Remove utility">✕</button>
                         </>
                       )}
@@ -1235,7 +1196,7 @@ function UtilityTab({ utilities, utilBuildings, utilBuildingData, allMonths, bui
                       placeholder="Account #" className="border border-blue-300 rounded px-1.5 py-0.5 text-xs w-24 font-mono" autoFocus
                       onKeyDown={(e) => { if (e.key === "Enter") saveAccountNumber(b.id, editingAcct.utilType, editingAcct.value); if (e.key === "Escape") setEditingAcct(null); }} />
                     <button onClick={() => saveAccountNumber(b.id, editingAcct.utilType, editingAcct.value)} className="text-emerald-600 text-xs">✓</button>
-                    <button onClick={() => setEditingAcct(null)} className="text-stone-400 text-xs">✕</button>
+                    <button disabled={!canManage} onClick={() => setEditingAcct(null)} className="text-stone-400 text-xs">✕</button>
                   </div>
                 )}
                 {assignedUtils.length === 0 && !(editingAcct?.buildingId === b.id) && (
@@ -1264,7 +1225,7 @@ function UtilityTab({ utilities, utilBuildings, utilBuildingData, allMonths, bui
                     <span className="text-amber-700 capitalize font-medium">{t}:</span>
                     <span className="font-mono text-amber-600">{accts.join(", ") || "—"}</span>
                     <span className="text-amber-400">({typeBills.length})</span>
-                    <button onClick={() => unassignFromGeneral(t)}
+                    <button hidden={!canManage} onClick={() => unassignFromGeneral(t)}
                       className="text-amber-300 hover:text-red-500 ml-0.5" title="Remove from General Expenses">✕</button>
                   </div>
                 );
@@ -1356,7 +1317,7 @@ function UtilityTab({ utilities, utilBuildings, utilBuildingData, allMonths, bui
                         editingBill={editingBill} setEditingBill={setEditingBill} editUtilityBill={editUtilityBill} />
                       <span className="text-stone-500">{bill.usage_quantity ? `${bill.usage_quantity} ${bill.usage_unit || ""}` : "—"}</span>
                       <span className="text-stone-500 truncate">{bill.provider_name || "—"}</span>
-                      <button onClick={() => deleteUtilityBill(bill.id)}
+                      <button hidden={!canManage} onClick={() => deleteUtilityBill(bill.id)}
                         className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity text-right">✕</button>
                     </div>
                   ))}
@@ -1375,6 +1336,7 @@ function UtilityTab({ utilities, utilBuildings, utilBuildingData, allMonths, bui
 // ══════════════════════════════════════════
 
 function ValuationsTab({ buildingVals, totalVal, totalValPct, appraisals, buildings, editAppraisal }: any) {
+  const canManage = useContext(ParishAdminContext);
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(null);
   const [editingVal, setEditingVal] = useState<{ id: number; building: string; field: string; value: string } | null>(null);
 
@@ -1512,7 +1474,7 @@ function ValuationsTab({ buildingVals, totalVal, totalValPct, appraisals, buildi
                 <div className="divide-y divide-stone-50">
                   {history.map((h, idx) => {
                     const isEditingThis = (f: string) => editingVal?.id === h.id && editingVal?.building === bv.name && editingVal?.field === f;
-                    const startEdit = (f: string, v: string) => setEditingVal({ id: h.id, building: bv.name, field: f, value: v });
+                    const startEdit = (f: string, v: string) => canManage && setEditingVal({ id: h.id, building: bv.name, field: f, value: v });
                     const saveEdit = () => {
                       if (editingVal) {
                         editAppraisal(editingVal.id, { building_name: editingVal.building, [editingVal.field]: editingVal.value });
@@ -1606,7 +1568,8 @@ function FinancesTab({ utilities, estMonthly, bldgFinances, todos }: any) {
 
 const HTYPE = { upload: { label: "Upload", dot: "bg-blue-400", badge: "bg-blue-50 text-blue-700" }, task_added: { label: "Added", dot: "bg-stone-400", badge: "bg-stone-100 text-stone-600" }, task_changed: { label: "Changed", dot: "bg-amber-400", badge: "bg-amber-50 text-amber-700" }, task_addressed: { label: "Addressed", dot: "bg-emerald-400", badge: "bg-emerald-50 text-emerald-700" } };
 
-function HistoryTab({ historyByMonth, historyFilter, setHistoryFilter, history, uploadedDocs, removeUploadedDoc, showToast, utilities, appraisals, editUtilityBill, deleteUtilityBill, editAppraisal, refreshData, parishId, getAccessTokenSilently }: any) {
+function HistoryTab({ historyByMonth, historyFilter, setHistoryFilter, history, uploadedDocs, removeUploadedDoc, showToast, utilities, appraisals, editUtilityBill, deleteUtilityBill, editAppraisal }: any) {
+  const canManage = useContext(ParishAdminContext);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [expandedEntry, setExpandedEntry] = useState<number | null>(null);
   const [editingField, setEditingField] = useState<{ billId: number; field: string; value: string } | null>(null);
@@ -1640,7 +1603,7 @@ function HistoryTab({ historyByMonth, historyFilter, setHistoryFilter, history, 
               const cfg = HTYPE[e.type as keyof typeof HTYPE] || HTYPE.task_added;
               const isRemoved = e.undone === "removed";
               const filename = e.type === "upload" ? getFilename(e.description) : null;
-              const canRemove = !isRemoved && filename && uploadedDocs?.[filename];
+              const canRemove = canManage && !isRemoved && filename && uploadedDocs?.[filename];
               const isConfirming = confirmRemove === `${e.id}-${filename}`;
               const isUpload = e.type === "upload" && !isRemoved;
               const isExpanded = expandedEntry === e.id;
@@ -1705,7 +1668,7 @@ function HistoryTab({ historyByMonth, historyFilter, setHistoryFilter, history, 
                                 <InlineEdit value={bill.account_number || "—"} field="account_number" billId={bill.id} type="text" editing={editingField} setEditing={setEditingField} onSave={editUtilityBill} />
                                 <InlineEdit value={bill.building_name || "—"} field="building_name" billId={bill.id} type="text" editing={editingField} setEditing={setEditingField} onSave={editUtilityBill} />
                                 <span className="text-stone-500 truncate">{bill.provider_name || "—"}</span>
-                                <button onClick={() => deleteUtilityBill(bill.id)}
+                                <button hidden={!canManage} onClick={() => deleteUtilityBill(bill.id)}
                                   className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity text-right">✕</button>
                               </div>
                             ))}
@@ -1761,8 +1724,10 @@ function InlineEdit({ value, rawValue, field, billId, type, editing, setEditing,
   value: any; rawValue?: any; field: string; billId: number; type: "text" | "number" | "date" | "select";
   editing: any; setEditing: any; onSave: any;
 }) {
+  const canManage = useContext(ParishAdminContext);
   const isEditing = editing?.billId === billId && editing?.field === field;
   const displayVal = value != null ? String(value) : "—";
+  if (!canManage) return <span className="text-stone-600 tabular-nums truncate">{displayVal}</span>;
   if (isEditing) {
     if (type === "select") {
       return (
@@ -1832,9 +1797,11 @@ function EditableCell({ value, rawValue, field, billId, type, editingBill, setEd
   value: any; rawValue?: any; field: string; billId: number; type: "text" | "number" | "date" | "select";
   editingBill: any; setEditingBill: any; editUtilityBill: any;
 }) {
+  const canManage = useContext(ParishAdminContext);
   const isEditing = editingBill?.id === billId && editingBill?.field === field;
   const displayVal = value != null ? String(value) : "—";
 
+  if (!canManage) return <span className="text-stone-600 tabular-nums truncate">{displayVal}</span>;
   if (isEditing) {
     if (type === "select") {
       return (

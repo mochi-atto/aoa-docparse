@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api, { setAuthToken } from "../services/api";
 
 interface Parish {
+  role?: "admin" | "editor" | "viewer";
   id: number;
   name: string;
   diocese: string | null;
@@ -21,8 +22,6 @@ export default function ParishSelectPage() {
 
   // Create form
   const [newName, setNewName] = useState("");
-  const [newDiocese, setNewDiocese] = useState("");
-  const [newAddress, setNewAddress] = useState("");
   const [newBuildings, setNewBuildings] = useState<string[]>([""]); // Start with one empty input
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
@@ -126,6 +125,7 @@ export default function ParishSelectPage() {
                     <div className="flex items-center justify-between pr-8">
                       <div>
                         <span className="font-semibold text-stone-800" style={{ fontFamily: "'Fraunces', serif" }}>{p.name}</span>
+                        <span className="ml-2 text-xs text-stone-500 capitalize">{p.role}</span>
                         {p.diocese && <span className="text-sm text-stone-400 ml-2">· {p.diocese}</span>}
                       </div>
                       <span className="text-stone-300 group-hover:text-stone-500 transition-colors">→</span>
@@ -136,7 +136,7 @@ export default function ParishSelectPage() {
                       ))}</div>
                     )}
                   </button>
-                  <button
+                  <button hidden={p.role !== "admin"}
                     onClick={(e) => openDeleteModal(p, e)}
                     className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity text-stone-300 hover:text-red-500 p-1 rounded"
                     title="Delete parish"
@@ -155,7 +155,7 @@ export default function ParishSelectPage() {
           )}
 
           {/* Create button / form */}
-          {!showCreate ? (
+          {(parishes.length === 0 || parishes.some(p => p.role === "admin")) && (!showCreate ? (
             <button onClick={() => setShowCreate(true)}
               className="w-full bg-stone-800 hover:bg-stone-900 text-white py-3 rounded-xl text-sm font-medium transition-colors">
               + Create New Parish
@@ -204,7 +204,7 @@ export default function ParishSelectPage() {
                 </div>
               </div>
             </div>
-          )}
+          ))}
         </div>
       </div>
 
