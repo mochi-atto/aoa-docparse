@@ -23,6 +23,54 @@ DEFAULT_DUE_DAYS = {
     "low": 30,
 }
 
+TRANSITIONS = {
+    "claim": {
+        "from": {"unassigned"},
+        "to": "assigned",
+        },
+    "start": {
+            "from": {"assigned"},
+            "to": "in_progress",
+        },
+    "hold": {
+            "from": {"assigned", "in_progress"},
+            "to": "on_hold",
+        },
+    "resume": {
+            "from": {"on_hold"},
+            "to": None, # uses status_before_hold (either assigned or in_progress)
+        },
+    "submit": {
+            "from": {"in_progress"},
+            "to": "ready_for_review",
+        },
+    "close": {
+            "from": {"ready_for_review"},
+            "to": "closed",
+        },
+}
+
+def apply_transition(order: WorkOrder, action: str) -> str:
+    transition = TRANSITIONS[action]
+
+    if (order.status not in transition["from"]):
+        raise HTTPException(status_code=409, detail=f"Cannot {action} a work order that is {order.status}")
+
+    if (transition["to"] is None):
+        target = order.status_before_hold
+    else:
+        target = transition["to"]
+
+
+    if (action == "hold"):
+        order.status_before_hold = order.status
+    elif (action == "resume"):
+        order.status_before_hold = None
+
+    order.status = target
+    return target
+        
+
 class WorkOrderCreate(BaseModel):
     title: str
     description: Optional[str] = None
@@ -62,7 +110,7 @@ class WorkOrderResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
+# view a parish's work orders
 @router.get("/{parish_id}/work-orders", response_model=List[WorkOrderResponse])
 def list_work_orders(
     parish_id: int,
@@ -77,6 +125,7 @@ def list_work_orders(
         .all()
     )
 
+# create a work order
 @router.post("/{parish_id}/work-orders", response_model=WorkOrderResponse)
 def create_work_order(
     parish_id: int,
@@ -157,3 +206,35 @@ def create_work_order(
     db.refresh(order)
     return order
 
+# claim a work order
+@router.post("/{parish_id}/work-orders/{order_id}/claim", response_model=WorkOrderResponse)
+def claim_work_order(
+    parish_id: int,
+    order_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+
+    require(user, "work_orders.claim")
+    work_order = (
+        db.query(WorkOrder).filter(WorkOrder.id == order_id, WorkOrder.parish_id == parish_id).first()
+    )
+
+    if work_order is None:
+        raise HTTPException(status_code=404, detail="Work order not found")
+
+    apply_transition(work_order, "claim")
+    work_order.technician_sub = user.sub
+    work_order.technician_name = user.name
+
+    db.add(HistoryEntry(
+        parish_id=parish_id,
+        entry_type="work_order_claimed",
+        description=f"Work order {work_order.display_number} claimed by: {user.name}",
+        related_type="work_order",
+        related_id=work_order.id,
+    ))
+
+    db.commit()
+    db.refresh(work_order)
+    return work_order
