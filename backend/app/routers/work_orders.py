@@ -69,7 +69,16 @@ def apply_transition(order: WorkOrder, action: str) -> str:
 
     order.status = target
     return target
-        
+
+def get_work_order(db: Session, parish_id: int, order_id: int) -> WorkOrder:
+    work_order = (
+        db.query(WorkOrder).filter(WorkOrder.id == order_id, WorkOrder.parish_id == parish_id).first()
+    )
+
+    if work_order is None:
+        raise HTTPException(status_code=404, detail="Work order not found")
+
+    return work_order
 
 class WorkOrderCreate(BaseModel):
     title: str
@@ -206,7 +215,7 @@ def create_work_order(
     db.refresh(order)
     return order
 
-# claim a work order
+# claim a work order (unassigned -> assigned)
 @router.post("/{parish_id}/work-orders/{order_id}/claim", response_model=WorkOrderResponse)
 def claim_work_order(
     parish_id: int,
@@ -216,12 +225,7 @@ def claim_work_order(
 ):
 
     require(user, "work_orders.claim")
-    work_order = (
-        db.query(WorkOrder).filter(WorkOrder.id == order_id, WorkOrder.parish_id == parish_id).first()
-    )
-
-    if work_order is None:
-        raise HTTPException(status_code=404, detail="Work order not found")
+    work_order = get_work_order(db, parish_id, order_id)
 
     apply_transition(work_order, "claim")
     work_order.technician_sub = user.sub
@@ -231,6 +235,85 @@ def claim_work_order(
         parish_id=parish_id,
         entry_type="work_order_claimed",
         description=f"Work order {work_order.display_number} claimed by: {user.name}",
+        related_type="work_order",
+        related_id=work_order.id,
+    ))
+
+    db.commit()
+    db.refresh(work_order)
+    return work_order
+
+# start a work order (assigned -> in_progress)
+@router.post("/{parish_id}/work-orders/{order_id}/start", response_model=WorkOrderResponse)
+def start_work_order(
+    parish_id: int,
+    order_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+
+    require(user, "work_orders.start")
+    work_order = get_work_order(db, parish_id, order_id)
+
+    apply_transition(work_order, "start")
+    work_order.started_at = datetime.datetime.utcnow()
+
+    db.add(HistoryEntry(
+        parish_id=parish_id,
+        entry_type="work_order_started",
+        description=f"Work order {work_order.display_number} started by: {user.name}",
+        related_type="work_order",
+        related_id=work_order.id,
+    ))
+
+    db.commit()
+    db.refresh(work_order)
+    return work_order
+
+# hold a work order (assigned/in_progress -> on_hold)
+@router.post("/{parish_id}/work-orders/{order_id}/hold", response_model=WorkOrderResponse)
+def hold_work_order(
+    parish_id: int,
+    order_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+
+    require(user, "work_orders.hold")
+    work_order = get_work_order(db, parish_id, order_id)
+
+    apply_transition(work_order, "hold")
+
+    db.add(HistoryEntry(
+        parish_id=parish_id,
+        entry_type="work_order_on_hold",
+        description=f"Work order {work_order.display_number} put on hold by: {user.name}",
+        related_type="work_order",
+        related_id=work_order.id,
+    ))
+
+    db.commit()
+    db.refresh(work_order)
+    return work_order
+
+# resume a work order (on_hold -> assigned/in_progress )
+@router.post("/{parish_id}/work-orders/{order_id}/resume", response_model=WorkOrderResponse)
+def resume_work_order(
+    parish_id: int,
+    order_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+
+    require(user, "work_orders.resume")
+    work_order = get_work_order(db, parish_id, order_id)
+
+    apply_transition(work_order, "resume")
+
+    db.add(HistoryEntry(
+        parish_id=parish_id,
+        entry_type="work_order_resumed",
+        description=f"Work order {work_order.display_number} resumed by: {user.name}",
         related_type="work_order",
         related_id=work_order.id,
     ))
