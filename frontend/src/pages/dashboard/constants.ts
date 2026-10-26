@@ -21,7 +21,7 @@ export const UTIL_TYPES = ["electric", "water", "gas", "waste"] as const;
 export const UTIL_LABEL: Record<string, string> = { electric: "Electric", water: "Water", gas: "Gas", waste: "Waste" };
 export const UTIL_COLOR: Record<string, string> = { electric: "#f59e0b", water: "#3b82f6", gas: "#ef4444", waste: "#8b5cf6" };
 export const UTIL_ICON: Record<string, string> = { electric: "⚡", water: "💧", gas: "🔥", waste: "♻️" };
-export const UTIL_TYPE_OPTIONS = ["electric", "water", "gas", "waste", "internet", "phone", "other"];
+export const UTIL_TYPE_OPTIONS = ["electric", "water", "gas", "waste", "other"];
 
 export const BAR_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 

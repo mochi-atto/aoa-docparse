@@ -27,6 +27,7 @@ async def upload_document(
     file: UploadFile = File(...),
     parish_id: int = Form(...),
     doc_type: str = Form(...),  # "utility" or "appraisal"
+    extracted_text: str | None = Form(None),
     db: Session = Depends(get_db),
     user=Depends(verify_token),
 ):
@@ -45,7 +46,7 @@ async def upload_document(
     try:
         if doc_type == "utility":
             # Parser now returns a LIST of bills
-            bills = parse_utility_bill(tmp_path)
+            bills = parse_utility_bill(tmp_path, extracted_text=extracted_text)
 
             if not bills:
                 return UploadResponse(
@@ -118,7 +119,7 @@ async def upload_document(
                 },
             )
 
-        else:  # appraisal
+        else:  # appraisal: local PDF parsing only; never sent to an AI service
             # Fetch the active template (default first, then any)
             from app.models.extraction_template import ExtractionTemplate
             template_record = (

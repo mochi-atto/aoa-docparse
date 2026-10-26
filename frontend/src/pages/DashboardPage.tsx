@@ -2,6 +2,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api, { setAuthToken } from "../services/api";
+import { extractUtilityText } from "../services/browserOcr";
 import type { BuildingData, Parish, UtilityBill, Appraisal, TodoItem, WorkOrder, WorkOrderPriority, HistoryEntry, TabKey } from "./dashboard/types";
 import { UTIL_TYPES, BAR_COLORS, TABS } from "./dashboard/constants";
 import { fmtDate, fmtMonth, fmtMonthLong, monthKey, bldgName } from "./dashboard/helpers";
@@ -253,10 +254,16 @@ export default function DashboardPage() {
         setUploadProgress({ ...progress });
 
         try {
+          const utilityText = await extractUtilityText(file, (ocrProgress) => {
+            progress[file.name] = { status: "parsing", progress: Math.max(30, Math.round(30 + ocrProgress * 0.5)) };
+            setUploadProgress({ ...progress });
+          });
+
           const form = new FormData();
           form.append("file", file);
           form.append("parish_id", parishId);
           form.append("doc_type", uploadType);
+          form.append("extracted_text", utilityText);
 
           // Simulated progress stages
           const progressInterval = setInterval(() => {
