@@ -12,20 +12,22 @@ from typing import List
 router = APIRouter()
 
 # ── Utility type normalization ──
-# The LLM may return "trash", "sewer", "sewage", etc. — normalize to canonical types.
+# Canonical types are electric, water, gas, waste, other (must match the parser prompt and the
+# frontend's UTIL_TYPE_OPTIONS). Sewer/stormwater count as water; waste is solid waste pickup only.
+# Older records may hold "sewer", "trash", etc. — normalize to canonical types; anything else is "other".
 UTIL_TYPE_MAP = {
     "electric": "electric", "electricity": "electric", "power": "electric",
-    "water": "water",
-    "gas": "gas", "natural gas": "gas",
+    "water": "water", "sewer": "water", "sewage": "water", "wastewater": "water", "stormwater": "water",
+    "gas": "gas", "natural gas": "gas", "propane": "gas",
     "waste": "waste", "trash": "waste", "garbage": "waste", "refuse": "waste", "solid waste": "waste",
-    "sewer": "waste", "sewage": "waste", "wastewater": "waste",
-    "internet": "internet", "phone": "phone", "other": "other",
+    "sanitation": "waste", "recycling": "waste",
+    "other": "other",
 }
 
 def _normalize_util_type(raw: str | None) -> str:
     if not raw:
         return "other"
-    return UTIL_TYPE_MAP.get(raw.lower().strip(), raw.lower().strip())
+    return UTIL_TYPE_MAP.get(raw.lower().strip(), "other")
 
 
 def _build_account_map(parish_id: int, db: Session) -> dict[str, str]:

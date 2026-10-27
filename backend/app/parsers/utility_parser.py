@@ -24,6 +24,7 @@ unique bill separately.
 A unique bill is defined by a unique combination of:
 - Service address / building
 - Billing period / bill date
+- Utility type (when one statement itemizes several services)
 
 Return a JSON object with a single key "bills" containing an array.
 Each element in the array should have these exact keys:
@@ -32,7 +33,7 @@ Each element in the array should have these exact keys:
   "bills": [
     {
       "provider_name": "string — the utility company name",
-      "utility_type": "string — one of: electric, gas, water, sewer, trash, internet, phone, other",
+      "utility_type": "string — exactly one of: electric, water, gas, waste, other (see UTILITY TYPE RULES)",
       "service_address": "string or null — the specific service address / building this bill is for",
       "building_name": "string or null — a short label if the document names the building (e.g., 'Building A', 'Rectory', 'Church')",
       "bill_date": "YYYY-MM-DD — the date the bill was issued",
@@ -40,7 +41,7 @@ Each element in the array should have these exact keys:
       "billing_period_start": "YYYY-MM-DD or null",
       "billing_period_end": "YYYY-MM-DD or null",
       "account_number": "string or null",
-      "total_amount": "float — the total amount due for THIS billing period for THIS building",
+      "total_amount": "float — the CURRENT CHARGES for THIS billing period, THIS building, and THIS utility type (see AMOUNT RULES)",
       "usage_quantity": "float or null — usage amount (e.g., 1200 for 1200 kWh)",
       "usage_unit": "string or null — e.g., kWh, therms, gallons, CCF",
       "rate": "float or null — cost per unit if available"
@@ -57,6 +58,36 @@ CRITICAL RULES:
 - For dates, use YYYY-MM-DD format.
 - For amounts, use numbers only (no $ signs).
 - If the page contains no utility bill data (e.g., it's a cover page, terms, or ad), return {"bills": []}.
+
+AMOUNT RULES (total_amount):
+- total_amount must be the charges incurred in THIS billing period only. Look for labels like
+  "Current Charges", "Total Current Charges", "New Charges", or "Charges This Period".
+- NEVER use "Previous Balance", "Prior Balance", "Balance Forward", "Payments", "Payments Received",
+  "Adjustments", or "Credits" as total_amount — these describe past periods.
+- "Account Balance", "Amount Due", or "Total Amount Due" may include unpaid past balances or late fees.
+  Use them only if no current-charges figure is shown.
+- Example: "Previous Balance $281.82 / Payments $281.82 / Current Charges $303.67 /
+  Account Balance $303.67" → total_amount = 303.67.
+
+UTILITY TYPE RULES (utility_type):
+- "electric": electricity / power service.
+- "water": drinking water AND sewer, sewage, wastewater, and stormwater service.
+- "gas": natural gas / propane service.
+- "waste": solid waste only — trash, garbage, refuse, sanitation, recycling, and dumpster/pickup service.
+- Sewer is NOT "waste"; it is "water".
+- "other": any other billed service (internet, phone, cable, etc.). Use it only when none of the
+  four types above fits.
+
+MULTI-SERVICE STATEMENTS:
+- Some statements (e.g., City of Atlanta Department of Watershed Management) itemize several services
+  with subtotal lines such as "Total Water Charges", "Total Sewer Charges", "Total Stormwater Charges",
+  or "Total Sanitation Charges".
+- Group these subtotals by utility_type and create ONE entry per utility_type, whose total_amount is the
+  SUM of that type's subtotals. Example: "Total Water Charges $88.10 / Total Sewer Charges $142.55 /
+  Total Stormwater Charges $12.00 / Total Sanitation Charges $25.00" → one "water" entry of 242.65 and
+  one "waste" entry of 25.00.
+- Put usage_quantity/usage_unit on the "water" entry; use null on the others.
+- Do NOT also create an entry for the statement's grand total when per-type entries were created.
 
 UTILITY BILL TEXT:
 """
@@ -158,6 +189,7 @@ def _deduplicate_bills(bills: list[dict]) -> list[dict]:
     Two bills are considered duplicates if they have the same:
     - service_address (or both null)
     - bill_date
+    - utility_type
     - total_amount
     """
     seen = set()
@@ -166,6 +198,7 @@ def _deduplicate_bills(bills: list[dict]) -> list[dict]:
         key = (
             bill.get("service_address") or bill.get("building_name") or "",
             str(bill.get("bill_date")),
+            bill.get("utility_type") or "",
             bill.get("total_amount", 0),
         )
         if key not in seen:

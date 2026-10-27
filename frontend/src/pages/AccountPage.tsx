@@ -1,42 +1,71 @@
 import { useAuth0 } from "@auth0/auth0-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import api, { setAuthToken } from "../services/api";
 
 export default function AccountPage() {
-  const { user, logout } = useAuth0();
+  const { user, logout, getAccessTokenSilently } = useAuth0();
   const navigate = useNavigate();
 
   const [name, setName] = useState(user?.name || "");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
-  const [profilePic, setProfilePic] = useState<string | null>(
-    localStorage.getItem("user-profile-pic") || user?.picture || null
-  );
+  const [isError, setIsError] = useState(false);
+  const [profilePic, setProfilePic] = useState<string | null>(user?.picture || null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const showMsg = (text: string, error = false) => { setMsg(text); setIsError(error); };
+
+  // Load saved profile settings from the database
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await getAccessTokenSilently();
+        setAuthToken(token);
+        const res = await api.get("/users/me");
+        if (res.data.display_name) setName(res.data.display_name);
+        if (res.data.picture_data) setProfilePic(res.data.picture_data);
+      } catch (err) { console.error("Profile load error:", err); }
+    })();
+  }, [getAccessTokenSilently]);
+
+  const updateProfile = async (updates: { display_name?: string; picture_data?: string }) => {
+    const token = await getAccessTokenSilently();
+    setAuthToken(token);
+    return api.put("/users/me", updates);
+  };
 
   const saveName = async () => {
     if (!name.trim()) return;
     setSaving(true); setMsg("");
-    localStorage.setItem("user-display-name", name.trim());
-    setMsg("Display name updated.");
-    setSaving(false);
+    try {
+      await updateProfile({ display_name: name.trim() });
+      showMsg("Display name updated.");
+    } catch (err) {
+      console.error(err);
+      showMsg("Could not update display name.", true);
+    } finally { setSaving(false); }
   };
 
   const handleProfilePic = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
     const r = new FileReader();
-    r.onload = () => {
+    r.onload = async () => {
       const d = r.result as string;
-      setProfilePic(d);
-      localStorage.setItem("user-profile-pic", d);
-      setMsg("Profile picture updated.");
+      try {
+        await updateProfile({ picture_data: d });
+        setProfilePic(d);
+        showMsg("Profile picture updated.");
+      } catch (err) {
+        console.error(err);
+        showMsg("Could not update profile picture.", true);
+      }
     };
     r.readAsDataURL(f);
   };
 
   const deleteAccount = () => {
     // In production: call Auth0 Management API to delete user
-    localStorage.clear();
     logout({ logoutParams: { returnTo: window.location.origin } });
   };
 
@@ -65,7 +94,7 @@ export default function AccountPage() {
                 <input type="file" accept="image/*" className="hidden" onChange={handleProfilePic} />
               </label>
               <div>
-                <p className="text-sm font-medium text-stone-700">{user?.name || "User"}</p>
+                <p className="text-sm font-medium text-stone-700">{name || user?.name || "User"}</p>
                 <p className="text-xs text-stone-400">{user?.email}</p>
                 <p className="text-xs text-stone-300 mt-0.5">Click photo to change</p>
               </div>
@@ -123,7 +152,7 @@ export default function AccountPage() {
             </div>
           </div>
 
-          {msg && <div className="rounded-lg p-3 text-sm bg-emerald-50 text-emerald-700">{msg}</div>}
+          {msg && <div className={`rounded-lg p-3 text-sm ${isError ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{msg}</div>}
         </div>
       </div>
     </>

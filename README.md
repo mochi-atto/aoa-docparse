@@ -4,12 +4,12 @@ A web application for church parishes to upload, parse, and manage utility bills
 
 ## Overview
 
-This system helps diocesan property managers track utility costs and building valuations across multiple parish properties. Upload a utility bill PDF and the system extracts structured data using OpenAI. Scanned utility bills are OCRed in the browser with Tesseract.js before their text is sent to the backend. Appraisals are entered through a guided form with PDF preview — no AI involved, keeping confidential appraisal data local.
+This system helps diocesan property managers track utility costs and building valuations across multiple parish properties. Upload a utility bill PDF and the system extracts structured data using OpenAI. Appraisals are entered through a guided form with PDF preview — no AI involved, keeping confidential data local.
 
 ### Key Features
 
-- **Utility Bill Parsing** — Upload PDF utility bills. Embedded PDF text is extracted in the browser; scanned pages are OCRed locally with Tesseract.js. The extracted text is sent to the backend, where OpenAI extracts provider, amount, date, account number, and utility type.
-- **Appraisal Entry** — Upload appraisal PDFs and enter data via a side-by-side guided form. PDF renders in-browser; values are copy-pasted with automatic cleaning (strips `$`, commas, labels). Fully local — appraisal files and extracted appraisal data are never sent to OpenAI or another AI service.
+- **Utility Bill Parsing** — Upload PDF utility bills. An LLM (OpenAI) extracts provider, amount, date, account number, and utility type automatically.
+- **Appraisal Entry** — Upload appraisal PDFs and enter data via a side-by-side guided form. PDF renders in-browser; values are copy-pasted with automatic cleaning (strips `$`, commas, labels). Fully local — no data sent to AI.
 - **Asset Tracking** — Per-parish asset register (location, manufacturer, install year, expected life, initial cost) with derived remaining life, editable annual accrual, a 10-year accrual plan, and a per-asset document holder. Suggested life/cost and the "worth tracking?" check are rule-of-thumb helpers. **Document storage and manual lookup are temporary** (see below).
 - **Dashboard** — Single-page overview with tabs for utility trends, building valuations, active risks/tasks, finances, and history.
 - **Building Management** — First-class building entities with per-building utility account tracking, valuation history, and task assignment.
@@ -23,7 +23,7 @@ This system helps diocesan property managers track utility costs and building va
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React, TypeScript, Tailwind CSS, Recharts, PDF.js, Tesseract.js |
+| Frontend | React 18, TypeScript, Tailwind CSS, Recharts, PDF.js |
 | Backend | Python 3.11, FastAPI, SQLAlchemy, Pydantic |
 | Database | PostgreSQL 16 (Docker) |
 | Auth | Auth0 |
@@ -43,8 +43,7 @@ parish-document-parser/
 │   │   │   ├── AppraisalEntryPage.tsx    # PDF preview + guided form
 │   │   │   └── AccountPage.tsx           # Profile, password, delete
 │   │   ├── services/
-│   │   │   ├── api.ts                    # Axios instance + auth
-│   │   │   └── browserOcr.ts              # PDF text extraction + browser OCR
+│   │   │   └── api.ts                    # Axios instance + auth
 │   │   └── App.tsx                       # Routes
 │   └── package.json
 ├── backend/
@@ -58,7 +57,7 @@ parish-document-parser/
 │   │   │   └── history_entry.py
 │   │   ├── routers/
 │   │   │   ├── parishes.py              # Parish + building CRUD
-│   │   │   ├── upload.py                # File upload; utility AI, appraisal local
+│   │   │   ├── upload.py                # File upload + LLM parsing
 │   │   │   ├── assets.py                # Asset CRUD + documents + manual lookup
 │   │   │   ├── data.py                  # Utility/appraisal data + edit/delete
 │   │   │   └── parish_data.py           # Todos + history
@@ -84,76 +83,16 @@ parish-document-parser/
 - Python 3.11+
 - Docker (for PostgreSQL)
 - Auth0 account (free tier works)
-- OpenAI API key (required for utility bill extraction only)
+- OpenAI API key
 
-This repository is public. Do not commit passwords, API keys, Auth0 secrets, tokens, or production connection strings. Ask the development team for the private development credentials and store them only in local `.env` files. `.env` files are ignored by Git.
-
-No native Tesseract installation is required. OCR for scanned utility bills runs in the browser using Tesseract.js. The first OCR run downloads the Tesseract worker, language data, and WebAssembly core, so the browser needs network access unless those assets are self-hosted.
-
-### 1. Environment setup
-
-This repository intentionally keeps real secrets out of Git. Create local `.env` files from the example templates in each folder, then fill in your own values.
-
-Copy the example files before editing them:
-
-```bash
-cp backend/.env.example backend/.env
-cp docker/.env.example docker/.env
-cp frontend/.env.example frontend/.env
-```
-
-1. Start with the Docker database values in `docker/.env`.
-2. Use those exact values in the backend `DATABASE_URL` in `backend/.env`.
-3. Add the Auth0 values in both the backend and frontend env files.
-4. Add your own OpenAI API key in `backend/.env`.
-
-Use the local values from the project team where required:
-
-- For Auth0 values, look in the Auth0 dashboard for the application/domain, client ID, and API audience. If you are working on this repo with the project team, reach out to the project maintainer for the shared development values.
-- (Local Testing) For the OpenAI key, create or access your own API key in the OpenAI dashboard and place it in `backend/.env`.
-- For the database values, check the local Docker config in `docker/.env`: `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`. Those values are the same ones that should be used in the backend connection string `DATABASE_URL`.
-
-Do not commit any real `.env` file.
-
-### 2. Database
-
-The Docker Compose configuration runs PostgreSQL only. It does not build or run the backend or frontend. `docker compose up -d` creates the database container if it does not already exist and starts it in the background; subsequent runs start the existing container.
-
-Create `docker/.env` first using your local values:
-
-```env
-POSTGRES_USER=your_local_db_user
-POSTGRES_PASSWORD=your_local_db_password
-POSTGRES_DB=your_local_db_name
-```
-
-These are the values that will power the local Postgres container. The backend database URL must match them exactly.
+### 1. Database
 
 ```bash
 cd docker
 docker compose up -d
 ```
 
-PostgreSQL is available only from the local computer at `127.0.0.1:5432`.
-
-Check the container status and logs:
-
-```bash
-docker compose ps
-docker compose logs -f db
-```
-
-Press `Ctrl+C` to stop following logs. To stop the database while keeping its data:
-
-```bash
-docker compose stop
-```
-
-To stop and remove the container while keeping its data volume:
-
-```bash
-docker compose down
-```
+This starts PostgreSQL on port 5432. Default config uses trust auth for local development.
 
 If you need to reset the database (drops all data):
 
@@ -162,35 +101,23 @@ docker compose down -v
 docker compose up -d
 ```
 
-The reset command permanently deletes the PostgreSQL volume. Only use it for a fresh local setup or when instructed by the project maintainer.
-
-### 3. Backend
+### 2. Backend
 
 ```bash
 cd backend
-py -3.11 -m venv venv
+python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-The backend requirements do not include `pytesseract` or a native Tesseract executable. The backend handles PDF uploads and OpenAI utility extraction; browser OCR supplies text for scanned utility PDFs.
-
-Create a `.env` file in `backend/` from the example file and fill in your values:
+Create a `.env` file in `backend/`:
 
 ```env
-DATABASE_URL=postgresql://your_local_db_user:your_local_db_password@localhost:5432/your_local_db_name
-OPENAI_API_KEY=your_openai_api_key_here
+DATABASE_URL=postgresql://parish_admin:parish_admin@localhost:5432/parish_docs
 AUTH0_DOMAIN=your-tenant.auth0.com
 AUTH0_API_AUDIENCE=your-api-identifier
-AUTH0_ALGORITHMS=RS256
-ALLOWED_ORIGINS=http://localhost:5173
+OPENAI_API_KEY=sk-...
 ```
-
-Notes:
-
-- `OPENAI_API_KEY` should be your own API key; do not reuse someone else’s key.
-- `AUTH0_DOMAIN`, `AUTH0_API_AUDIENCE`, and related values should be requested from the project maintainer.
-- `AUTH0_ALGORITHMS` and `ALLOWED_ORIGINS` are optional and usually default correctly for local development.
 
 Run the server:
 
@@ -200,21 +127,20 @@ uvicorn app.main:app --reload --port 8000
 
 Tables are created automatically on first start via `Base.metadata.create_all()`.
 
-### 4. Frontend
+### 3. Frontend
 
 ```bash
 cd frontend
 npm install
 ```
 
-This installs the frontend OCR dependency (`tesseract.js`) as well as the existing PDF.js dependency. No separate OCR installer is needed on the developer machine or end-user machine.
-
-Create a `.env` file in `frontend/` from the example file and fill in the Auth0 values:
+Create a `.env` file in `frontend/`:
 
 ```env
 VITE_AUTH0_DOMAIN=your-tenant.auth0.com
 VITE_AUTH0_CLIENT_ID=your-client-id
 VITE_AUTH0_AUDIENCE=your-api-identifier
+VITE_API_BASE_URL=http://localhost:8000/api
 ```
 
 Run the dev server:
@@ -224,6 +150,15 @@ npm run dev
 ```
 
 Open `http://localhost:5173`.
+
+### Auth0 Configuration
+
+1. Create a **Single Page Application** in Auth0
+2. Set Allowed Callback URLs: `http://localhost:5173/callback`
+3. Set Allowed Logout URLs: `http://localhost:5173`
+4. Set Allowed Web Origins: `http://localhost:5173`
+5. Create an **API** with your chosen identifier
+6. Use the domain, client ID, and audience in your `.env` files
 
 ## Usage
 
@@ -238,7 +173,7 @@ Open `http://localhost:5173`.
 
 1. On the dashboard, select **"Utility"** in the upload bar
 2. Click **"+ Add Files"** and select one or more PDF bills
-3. Click **"Parse & Upload"** — text-based PDFs are read in the browser; scanned PDFs are OCRed in the browser, then the extracted text is sent to OpenAI for structured extraction
+3. Click **"Parse & Upload"** — the LLM extracts data from each bill
 4. Bills appear on the Utility tab grouped by building/account
 
 ### Entering Appraisal Data
@@ -249,8 +184,6 @@ Open `http://localhost:5173`.
 4. Copy values from the PDF and paste into the form — dollar signs, commas, and labels are stripped automatically
 5. Buildings are pre-populated from your parish's building list
 6. Click **"Save Appraisal"**
-
-Appraisal privacy boundary: appraisal PDFs are rendered and parsed locally with PDF.js, `pdfplumber`, and the guided form. The appraisal upload path calls `parse_appraisal` only and does not call the OpenAI client. OpenAI is used by the utility parser only.
 
 ### Managing Accounts
 
@@ -298,7 +231,7 @@ The system normalizes utility types from LLM output:
 - `DELETE /api/data/appraisal/{id}` — Delete appraisal
 
 ### Upload
-- `POST /api/upload/` — Upload and parse a PDF (utility or appraisal). Utility uploads may include browser-extracted text in the optional `extracted_text` form field; appraisal uploads use local parsing only.
+- `POST /api/upload/` — Upload and parse a PDF (utility or appraisal)
 
 ### Todos & History
 - `GET /api/parishes/{id}/todos` — List tasks

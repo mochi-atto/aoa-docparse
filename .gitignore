@@ -5,14 +5,5 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Local environment files and secrets
-.env
-.env.*
-!.env.example
-docker/.env
-backend/.env
-frontend/.env
-
-
 # TEMPORARY local asset document storage
 backend/uploads/
