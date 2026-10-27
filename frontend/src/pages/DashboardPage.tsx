@@ -6,6 +6,7 @@ import {
 } from "recharts";
 import api, { setAuthToken } from "../services/api";
 import { extractUtilityText } from "../services/browserOcr";
+import AssetsTab from "../components/AssetsTab";
 
 // ══════════════════════════════════════════
 // Types
@@ -18,7 +19,7 @@ interface Appraisal { id: number; entity_name?: string; appraisal_date?: string;
 interface TodoItem { id: number; text: string; building: string; priority: "red" | "yellow" | "green" | "blue"; prevPriority?: "red" | "yellow" | "green"; done: boolean; createdAt: string; }
 interface HistoryEntry { id: number; type: string; description: string; date: string; undone?: string; user_email?: string; user_name?: string; }
 
-type TabKey = "dashboard" | "utility" | "valuations" | "risks" | "finances" | "history";
+type TabKey = "dashboard" | "assets" | "utility" | "valuations" | "risks" | "finances" | "history";
 
 // ══════════════════════════════════════════
 // Constants
@@ -43,6 +44,7 @@ const BAR_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "dashboard",  label: "Dashboard" },
+  { key: "assets",     label: "Assets" },
   { key: "utility",    label: "Utility Use" },
   { key: "valuations", label: "Building Valuations" },
   { key: "risks",      label: "Active Risks" },
@@ -181,6 +183,15 @@ export default function DashboardPage() {
       const res = await api.post(`/parishes/${parishId}/history`, { entry_type: type, description });
       const h = res.data;
       setHistory((prev) => [{ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name }, ...prev]);
+    } catch { /* silent */ }
+  }, [parishId, getAccessTokenSilently]);
+
+  const refreshHistory = useCallback(async () => {
+    try {
+      const token = await getAccessTokenSilently();
+      setAuthToken(token);
+      const res = await api.get(`/parishes/${parishId}/history`);
+      setHistory(res.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
     } catch { /* silent */ }
   }, [parishId, getAccessTokenSilently]);
 
@@ -811,6 +822,7 @@ export default function DashboardPage() {
             startEditTask={startEditTask} saveEditTask={saveEditTask} setEditingTaskId={setEditingTaskId}
             setEditTaskText={setEditTaskText} setEditTaskPriority={setEditTaskPriority} setEditTaskBuilding={setEditTaskBuilding} deleteTask={deleteTask}
           />}
+          {activeTab === "assets" && <AssetsTab parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} showToast={showToast} onChanged={refreshHistory} />}
           {activeTab === "utility" && <UtilityTab utilities={utilities} utilBuildings={utilBuildings} utilBuildingData={utilBuildingData} allMonths={allMonths} buildings={buildings} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} setBuildings={setBuildings} refreshData={refreshData} editUtilityBill={editUtilityBill} deleteUtilityBill={deleteUtilityBill} showToast={showToast} />}
           {activeTab === "valuations" && <ValuationsTab buildingVals={buildingVals} totalVal={totalVal} totalValPct={totalValPct} appraisals={appraisals} buildings={buildings} editAppraisal={editAppraisal} />}
           {activeTab === "finances" && <FinancesTab utilities={utilities} estMonthly={estMonthly} bldgFinances={bldgFinances} todos={todos} />}
@@ -1550,13 +1562,13 @@ function FinancesTab({ utilities, estMonthly, bldgFinances, todos }: any) {
 // Tab: History
 // ══════════════════════════════════════════
 
-const HTYPE = { upload: { label: "Upload", dot: "bg-blue-400", badge: "bg-blue-50 text-blue-700" }, task_added: { label: "Added", dot: "bg-stone-400", badge: "bg-stone-100 text-stone-600" }, task_changed: { label: "Changed", dot: "bg-amber-400", badge: "bg-amber-50 text-amber-700" }, task_addressed: { label: "Addressed", dot: "bg-emerald-400", badge: "bg-emerald-50 text-emerald-700" } };
+const HTYPE = { upload: { label: "Upload", dot: "bg-blue-400", badge: "bg-blue-50 text-blue-700" }, asset: { label: "Asset", dot: "bg-violet-400", badge: "bg-violet-50 text-violet-700" }, task_added: { label: "Added", dot: "bg-stone-400", badge: "bg-stone-100 text-stone-600" }, task_changed: { label: "Changed", dot: "bg-amber-400", badge: "bg-amber-50 text-amber-700" }, task_addressed: { label: "Addressed", dot: "bg-emerald-400", badge: "bg-emerald-50 text-emerald-700" } };
 
 function HistoryTab({ historyByMonth, historyFilter, setHistoryFilter, history, uploadedDocs, removeUploadedDoc, showToast, utilities, appraisals, editUtilityBill, deleteUtilityBill, editAppraisal, refreshData, parishId, getAccessTokenSilently }: any) {
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [expandedEntry, setExpandedEntry] = useState<number | null>(null);
   const [editingField, setEditingField] = useState<{ billId: number; field: string; value: string } | null>(null);
-  const typeCounts: Record<string, number> = { upload: 0, task_added: 0, task_changed: 0, task_addressed: 0 };
+  const typeCounts: Record<string, number> = { asset: 0, upload: 0, task_added: 0, task_changed: 0, task_addressed: 0 };
   history.forEach((e: any) => typeCounts[e.type] = (typeCounts[e.type] || 0) + 1);
 
   const getFilename = (desc: string): string | null => {

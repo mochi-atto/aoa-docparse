@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     auth0_api_audience: str = ""
     auth0_algorithms: str = "RS256"
     allowed_origins: str = "http://localhost:5173"  # Vite dev server
+    asset_upload_dir: str = "uploads/assets"  # TEMPORARY local disk storage for asset documents
 
     class Config:
         env_file = ".env"

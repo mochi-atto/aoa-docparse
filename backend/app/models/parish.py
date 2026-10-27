@@ -18,3 +18,4 @@ class Parish(Base):
     todos = relationship("Todo", back_populates="parish", cascade="all, delete-orphan")
     history_entries = relationship("HistoryEntry", back_populates="parish", cascade="all, delete-orphan")
     buildings = relationship("Building", back_populates="parish", cascade="all, delete-orphan")
+    assets = relationship("Asset", back_populates="parish", cascade="all, delete-orphan")

@@ -13,3 +13,6 @@ docker/.env
 backend/.env
 frontend/.env
 
+
+# TEMPORARY local asset document storage
+backend/uploads/

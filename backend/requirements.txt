@@ -15,3 +15,5 @@ pymupdf==1.24.10
 
 # Appraisal parsing (local only)
 pdfplumber==0.11.2
+# Tests
+pytest==9.2.0

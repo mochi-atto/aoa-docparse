@@ -10,6 +10,7 @@ This system helps diocesan property managers track utility costs and building va
 
 - **Utility Bill Parsing** — Upload PDF utility bills. Embedded PDF text is extracted in the browser; scanned pages are OCRed locally with Tesseract.js. The extracted text is sent to the backend, where OpenAI extracts provider, amount, date, account number, and utility type.
 - **Appraisal Entry** — Upload appraisal PDFs and enter data via a side-by-side guided form. PDF renders in-browser; values are copy-pasted with automatic cleaning (strips `$`, commas, labels). Fully local — appraisal files and extracted appraisal data are never sent to OpenAI or another AI service.
+- **Asset Tracking** — Per-parish asset register (location, manufacturer, install year, expected life, initial cost) with derived remaining life, editable annual accrual, a 10-year accrual plan, and a per-asset document holder. Suggested life/cost and the "worth tracking?" check are rule-of-thumb helpers. **Document storage and manual lookup are temporary** (see below).
 - **Dashboard** — Single-page overview with tabs for utility trends, building valuations, active risks/tasks, finances, and history.
 - **Building Management** — First-class building entities with per-building utility account tracking, valuation history, and task assignment.
 - **General Expenses** — Virtual category for non-building-specific utility bills (e.g., shared internet, parish-wide water).
@@ -58,6 +59,7 @@ parish-document-parser/
 │   │   ├── routers/
 │   │   │   ├── parishes.py              # Parish + building CRUD
 │   │   │   ├── upload.py                # File upload; utility AI, appraisal local
+│   │   │   ├── assets.py                # Asset CRUD + documents + manual lookup
 │   │   │   ├── data.py                  # Utility/appraisal data + edit/delete
 │   │   │   └── parish_data.py           # Todos + history
 │   │   ├── schemas/
@@ -305,3 +307,31 @@ The system normalizes utility types from LLM output:
 - `DELETE /api/parishes/{id}/todos/{tid}` — Delete task
 - `GET /api/parishes/{id}/history` — List history entries
 - `POST /api/data/history/{eid}/mark-removed` — Mark history entry as removed
+
+### Assets
+- `GET /api/parishes/{id}/assets` — List assets (includes derived `remaining_life` and `annual_accrual`)
+- `POST /api/parishes/{id}/assets` — Create asset (optional `catalog_manuals` names to attach)
+- `PUT /api/parishes/{id}/assets/{aid}` — Update asset; send `accrual_override: null` to reset to cost ÷ life
+- `DELETE /api/parishes/{id}/assets/{aid}` — Delete asset and its files
+- `POST /api/parishes/{id}/assets/{aid}/documents` — Upload documents (multipart `files`)
+- `GET /api/parishes/{id}/assets/{aid}/documents/{did}/file` — Download an uploaded document
+- `DELETE /api/parishes/{id}/assets/{aid}/documents/{did}` — Remove a document
+- `GET /api/parishes/{id}/assets/manual-lookup?asset_type=&manufacturer=` — **Temporary** sample-catalog lookup
+
+### Temporary pieces (replace before production)
+
+| Piece | Where | What it does now | Needs |
+|-------|-------|------------------|-------|
+| Asset document storage | `backend/app/services/temp_asset_storage.py` | Saves uploads to local disk (`ASSET_UPLOAD_DIR`, default `backend/uploads/assets`, git-ignored) | Object storage (S3/GCS); local disk is lost on redeploy |
+| Manual lookup | `backend/app/services/temp_manual_lookup.py` | Hard-coded list of manual *names* by manufacturer/type; attaching one records only the name | A real manual source |
+
+The UI marks both with amber "Temporary" badges.
+
+### Tests
+
+```bash
+cd backend
+python -m pytest tests/test_assets_api.py
+```
+
+Uses in-memory SQLite and a temp upload directory; no Postgres or Auth0 needed.
