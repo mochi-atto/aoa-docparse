@@ -34,3 +34,29 @@ export interface UploadResponse {
   message: string;
   extracted_data: Record<string, unknown>;
 }
+
+export interface AssetDocument {
+  id: number;
+  filename: string;
+  source: "upload" | "catalog";
+  has_file: boolean; // false for catalog entries (name only)
+  size_bytes: number | null;
+  created_at: string;
+}
+
+export interface Asset {
+  id: number;
+  parish_id: number;
+  name: string;
+  asset_type: string | null;
+  location: string;
+  manufacturer: string | null;
+  year_installed: number;
+  expected_life: number;
+  initial_cost: number;
+  accrual_override: number | null;
+  remaining_life: number; // derived by the API
+  annual_accrual: number; // derived by the API
+  documents: AssetDocument[];
+  created_at: string;
+}

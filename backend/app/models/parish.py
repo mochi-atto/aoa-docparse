@@ -19,3 +19,4 @@ class Parish(Base):
     history_entries = relationship("HistoryEntry", back_populates="parish", cascade="all, delete-orphan")
     buildings = relationship("Building", back_populates="parish", cascade="all, delete-orphan")
     work_orders = relationship("WorkOrder", back_populates="parish", cascade="all, delete-orphan")
+    assets = relationship("Asset", back_populates="parish", cascade="all, delete-orphan")

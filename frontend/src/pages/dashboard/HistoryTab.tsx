@@ -3,13 +3,13 @@ import api from "../../services/api";
 import { UTIL_TYPE_OPTIONS } from "./constants";
 import { fmtDate, fmtTime } from "./helpers";
 
-const HTYPE = { upload: { label: "Upload", dot: "bg-blue-400", badge: "bg-blue-50 text-blue-700" }, task_added: { label: "Added", dot: "bg-stone-400", badge: "bg-stone-100 text-stone-600" }, task_changed: { label: "Changed", dot: "bg-amber-400", badge: "bg-amber-50 text-amber-700" }, task_addressed: { label: "Addressed", dot: "bg-emerald-400", badge: "bg-emerald-50 text-emerald-700" } };
+const HTYPE = { upload: { label: "Upload", dot: "bg-blue-400", badge: "bg-blue-50 text-blue-700" }, asset: { label: "Asset", dot: "bg-violet-400", badge: "bg-violet-50 text-violet-700" }, task_added: { label: "Added", dot: "bg-stone-400", badge: "bg-stone-100 text-stone-600" }, task_changed: { label: "Changed", dot: "bg-amber-400", badge: "bg-amber-50 text-amber-700" }, task_addressed: { label: "Addressed", dot: "bg-emerald-400", badge: "bg-emerald-50 text-emerald-700" } };
 
 export function HistoryTab({ historyByMonth, historyFilter, setHistoryFilter, history, uploadedDocs, removeUploadedDoc, showToast, utilities, appraisals, editUtilityBill, deleteUtilityBill, editAppraisal, refreshData, parishId, getAccessTokenSilently }: any) {
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [expandedEntry, setExpandedEntry] = useState<number | null>(null);
   const [editingField, setEditingField] = useState<{ billId: number; field: string; value: string } | null>(null);
-  const typeCounts: Record<string, number> = { upload: 0, task_added: 0, task_changed: 0, task_addressed: 0 };
+  const typeCounts: Record<string, number> = { asset: 0, upload: 0, task_added: 0, task_changed: 0, task_addressed: 0 };
   history.forEach((e: any) => typeCounts[e.type] = (typeCounts[e.type] || 0) + 1);
 
   const getFilename = (desc: string): string | null => {
