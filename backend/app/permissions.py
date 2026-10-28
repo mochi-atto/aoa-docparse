@@ -25,6 +25,7 @@ ROLE_PERMISSIONS = {
         "work_orders.claim",
         "work_orders.start",
         "work_orders.hold",
+        "work_orders.resume",
         "work_orders.submit",
         "work_orders.close",
     },
