@@ -99,3 +99,16 @@ This branch targets `role-selection`, preserving the unrelated role history for
 review. Its foundation is manually ported into `codex/unified-parish-management`;
 do not merge unrelated histories into main. The original worktree/database are
 preserved. Unified demo/browser configuration remains documented separately.
+
+
+## Draft pull requests
+
+- [PR #2: role hardening](https://github.com/mochi-atto/aoa-docparse/pull/2):
+  `codex/role-management-hardening` ? `role-selection`.
+- [PR #3: unified integration](https://github.com/mochi-atto/aoa-docparse/pull/3):
+  `codex/unified-parish-management` ? `work-order-lifecycle`.
+
+Both are drafts. Existing PR #1 is unchanged. Review #1 first; after it merges
+into work-orders, retarget #3 to work-orders and recheck the diff. Promotion to
+main needs separate approval. #2 reviews the unrelated role history; its
+foundation is already ported into #3, so do not force unrelated histories.
