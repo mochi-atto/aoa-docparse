@@ -179,14 +179,8 @@ To stop and remove the container while keeping its data volume:
 docker compose down
 ```
 
-If you need to reset the database (drops all data):
-
-```bash
-docker compose down -v
-docker compose up -d
-```
-
-The reset command permanently deletes the PostgreSQL volume. Only use it for a fresh local setup or when instructed by the project maintainer.
+Local verification must preserve the existing database. Use `docker compose stop`
+to stop PostgreSQL while keeping its data; do not remove the data volume.
 
 ### 3. Backend
 
