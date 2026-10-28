@@ -51,7 +51,7 @@ in the isolated worktrees.
 | Check | Result |
 | --- | --- |
 | `python -m pytest tests -q --disable-warnings` | 52 passed, 9 warnings, 4.90s |
-| `python -m unittest discover -s tests -q` | Unittest subset passes; excludes Eric's 10 pytest function tests |
+| `python -m unittest discover -s tests -q` | 42 passed, 3.453s; excludes Eric's 10 pytest function tests |
 | Role-hardening branch `python -m unittest discover -s tests -q` | 26 passed, 1.112s |
 | `npm run build` in unified | TypeScript + Vite pass, 676 modules |
 | `npm run lint -- --format json --output-file ../lint-results.json` | Exit 0; 0 errors / 0 warnings |
@@ -76,3 +76,16 @@ dependency/merge order, migration limitations, and exact PowerShell-friendly
 Python demo launcher commands. The original working directory still contains
 the user's uncommitted local fixes. New commits and pushes belong only to the
 new review branches. No shared branch or PR was merged or force-pushed.
+
+
+## Draft pull requests
+
+- [PR #2: role hardening](https://github.com/mochi-atto/aoa-docparse/pull/2):
+  `codex/role-management-hardening` ? `role-selection`.
+- [PR #3: unified integration](https://github.com/mochi-atto/aoa-docparse/pull/3):
+  `codex/unified-parish-management` ? `work-order-lifecycle`.
+
+Both are drafts. Existing PR #1 is unchanged. Review #1 first; after it merges
+into work-orders, retarget #3 to work-orders and recheck the diff. Promotion to
+main needs separate approval. #2 reviews the unrelated role history; its
+foundation is already ported into #3, so do not force unrelated histories.
