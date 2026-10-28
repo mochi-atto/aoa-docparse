@@ -1,3 +1,4 @@
+import { errorDetail } from "../services/errors";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -61,8 +62,8 @@ export default function ParishSelectPage() {
       });
       setParishes((prev) => [...prev, res.data]);
       setNewName(""); setNewBuildings([""]); setShowCreate(false);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || "Failed to create parish");
+    } catch (err) {
+      setError(errorDetail(err) || "Failed to create parish");
     } finally { setCreating(false); }
   };
 
@@ -92,8 +93,8 @@ export default function ParishSelectPage() {
       await api.delete(`/parishes/${deleteTarget.id}`);
       setParishes((prev) => prev.filter((p) => p.id !== deleteTarget.id));
       closeDeleteModal();
-    } catch (err: any) {
-      setDeleteError(err?.response?.data?.detail || "Failed to delete parish");
+    } catch (err) {
+      setDeleteError(errorDetail(err) || "Failed to delete parish");
     } finally { setDeleting(false); }
   };
 
