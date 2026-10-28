@@ -1,8 +1,9 @@
+import type { WorkOrderInput } from "./viewTypes";
 import { useState } from "react";
 import type { BuildingData, TodoItem, WorkOrderPriority } from "./types";
 import { WO_PRIORITIES, WO_PRIORITY_BADGE, TODO_TO_WO_PRIORITY } from "./constants";
 
-export function WorkOrderForm({ todo, buildings, createWorkOrder, onDone }: { todo?: TodoItem; buildings: BuildingData[]; createWorkOrder: (p: any) => Promise<boolean>; onDone: () => void }) {
+export function WorkOrderForm({ todo, buildings, createWorkOrder, onDone }: { todo?: TodoItem; buildings: BuildingData[]; createWorkOrder: (p: WorkOrderInput) => Promise<boolean>; onDone: () => void }) {
   const [title, setTitle] = useState(todo?.text || "");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<WorkOrderPriority>(todo ? TODO_TO_WO_PRIORITY[todo.priority] : "medium");

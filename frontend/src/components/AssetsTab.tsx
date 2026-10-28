@@ -24,13 +24,15 @@ function TempBadge({ children = "Temporary" }: { children?: string }) {
 }
 
 interface Props {
+  canManage: boolean;
+  canAttach: boolean;
   parishId: string | undefined;
   getAccessTokenSilently: () => Promise<string>;
   showToast: (msg: string, type?: "success" | "error") => void;
   onChanged: () => void; // refresh dashboard history after a change
 }
 
-export default function AssetsTab({ parishId, getAccessTokenSilently, showToast, onChanged }: Props) {
+export default function AssetsTab({ parishId, getAccessTokenSilently, showToast, onChanged, canManage, canAttach }: Props) {
   const base = `/parishes/${parishId}/assets`;
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -200,7 +202,7 @@ export default function AssetsTab({ parishId, getAccessTokenSilently, showToast,
             ))}
           </div>
           <span className="flex-1" />
-          <button onClick={() => setShowForm((s) => !s)} className="bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Add Asset</button>
+          <button disabled={!canManage} onClick={() => setShowForm((s) => !s)} className="bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Add Asset</button>
         </div>
 
         {/* Add asset form */}
@@ -307,13 +309,13 @@ export default function AssetsTab({ parishId, getAccessTokenSilently, showToast,
                     <td className="px-3 py-2.5 text-right whitespace-nowrap">{a.remaining_life} yrs<span className="inline-block w-14 h-1.5 bg-stone-200 rounded-full ml-2 align-middle overflow-hidden"><span className={`block h-full ${bar}`} style={{ width: `${pct}%` }} /></span></td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{money(a.initial_cost)}</td>
                     <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                      <input key={`${a.id}-${a.annual_accrual}`} type="number" min={0} step={1} defaultValue={Math.round(a.annual_accrual)} aria-label={`Annual accrual for ${a.name}`}
+                      <input disabled={!canManage} key={`${a.id}-${a.annual_accrual}`} type="number" min={0} step={1} defaultValue={Math.round(a.annual_accrual)} aria-label={`Annual accrual for ${a.name}`}
                         onBlur={(e) => commitAccrual(a, e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                         className={`w-24 text-right border rounded px-2 py-1 text-sm tabular-nums ${a.accrual_override != null ? "border-amber-400 bg-amber-50" : "border-stone-200"}`} />
-                      {a.accrual_override != null && <button onClick={() => run(async () => replace((await api.put<Asset>(`${base}/${a.id}`, { accrual_override: null })).data))} title={`Back to cost ÷ life (${money(a.initial_cost / a.expected_life)})`} className="ml-1 text-xs text-stone-400 hover:text-stone-700">reset</button>}
+                      {canManage && a.accrual_override != null && <button onClick={() => run(async () => replace((await api.put<Asset>(`${base}/${a.id}`, { accrual_override: null })).data))} title={`Back to cost ÷ life (${money(a.initial_cost / a.expected_life)})`} className="ml-1 text-xs text-stone-400 hover:text-stone-700">reset</button>}
                     </td>
                     <td className="px-3 py-2.5"><button onClick={() => setDocsAssetId(a.id)} className="text-xs px-2 py-1 rounded-md border border-stone-200 hover:bg-stone-50 text-stone-600">📎 {a.documents.length} file{a.documents.length === 1 ? "" : "s"}</button></td>
-                    <td className="px-3 py-2.5"><button onClick={() => removeAsset(a)} title="Delete asset" aria-label={`Delete ${a.name}`} className="text-stone-400 hover:text-red-500">
+                    <td className="px-3 py-2.5"><button disabled={!canManage} onClick={() => removeAsset(a)} title="Delete asset" aria-label={`Delete ${a.name}`} className="text-stone-400 hover:text-red-500">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" /></svg></button></td>
                   </tr>
                 );
@@ -327,14 +329,14 @@ export default function AssetsTab({ parishId, getAccessTokenSilently, showToast,
         </div>
       </div>
 
-      {docsAsset && <DocsDialog asset={docsAsset} base={base} run={run} replace={replace} onClose={() => setDocsAssetId(null)} />}
+      {docsAsset && <DocsDialog canAttach={canAttach} asset={docsAsset} base={base} run={run} replace={replace} onClose={() => setDocsAssetId(null)} />}
     </div>
   );
 }
 
 // ── Document holder ──
 
-function DocsDialog({ asset, base, run, replace, onClose }: { asset: Asset; base: string; run: (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>; replace: (a: Asset) => void; onClose: () => void }) {
+function DocsDialog({ canAttach, asset, base, run, replace, onClose }: { canAttach: boolean; asset: Asset; base: string; run: (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>; replace: (a: Asset) => void; onClose: () => void }) {
   const [suggested, setSuggested] = useState<string[]>([]);
   const have = new Set(asset.documents.map((d) => d.filename));
 
@@ -352,7 +354,9 @@ function DocsDialog({ asset, base, run, replace, onClose }: { asset: Asset; base
   };
   const open = (d: AssetDocument) => run(async () => {
     const res = await api.get(`${base}/${asset.id}/documents/${d.id}/file`, { responseType: "blob" });
-    window.open(URL.createObjectURL(res.data), "_blank");
+    const url = URL.createObjectURL(res.data);
+    const link = document.createElement("a"); link.href = url; link.download = d.filename; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
 
   const todo = suggested.filter((n) => !have.has(n));
@@ -367,7 +371,7 @@ function DocsDialog({ asset, base, run, replace, onClose }: { asset: Asset; base
             <li key={d.id} className="flex items-center gap-2 px-3 py-2 text-sm">
               <span className="flex-1 truncate">📄 {d.has_file ? <button onClick={() => open(d)} className="hover:underline">{d.filename}</button> : d.filename}</span>
               {!d.has_file && <TempBadge>Name only</TempBadge>}
-              <button onClick={() => run(async () => replace((await api.delete<Asset>(`${base}/${asset.id}/documents/${d.id}`)).data))} className="text-xs text-stone-400 hover:text-red-500">Remove</button>
+              <button disabled={!canAttach} onClick={() => run(async () => replace((await api.delete<Asset>(`${base}/${asset.id}/documents/${d.id}`)).data))} className="text-xs text-stone-400 hover:text-red-500">Remove</button>
             </li>
           ))}
         </ul>
@@ -376,7 +380,7 @@ function DocsDialog({ asset, base, run, replace, onClose }: { asset: Asset; base
             <div className="flex items-center gap-2 font-medium text-stone-700 mb-1"><TempBadge>Temporary lookup</TempBadge> Sample manuals for {asset.manufacturer || asset.asset_type}</div>
             {todo.map((n) => (
               <div key={n} className="flex items-center gap-2 py-0.5"><span className="flex-1 truncate">📄 {n}</span>
-                <button onClick={() => run(async () => replace((await api.post<Asset>(`${base}/${asset.id}/documents/catalog`, { filenames: [n] })).data))} className="text-xs text-emerald-700 font-medium">+ Attach</button></div>
+                <button disabled={!canAttach} onClick={() => run(async () => replace((await api.post<Asset>(`${base}/${asset.id}/documents/catalog`, { filenames: [n] })).data))} className="text-xs text-emerald-700 font-medium">+ Attach</button></div>
             ))}
             <div className="text-xs text-stone-500 mt-1">Placeholder names from a built-in list, not real files.</div>
           </div>
@@ -384,7 +388,7 @@ function DocsDialog({ asset, base, run, replace, onClose }: { asset: Asset; base
         <div className="text-xs text-stone-400 flex items-center gap-1.5 mb-3"><TempBadge>Temporary storage</TempBadge> Uploads live on the API server's local disk and may be lost on redeploy.</div>
         <div className="flex justify-between">
           <label className="px-3 py-2 rounded-lg text-sm border border-stone-300 text-stone-600 hover:bg-stone-50 cursor-pointer">+ Attach files
-            <input type="file" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ""; }} /></label>
+            <input disabled={!canAttach} type="file" accept=".pdf,.txt,.png,.jpg,.jpeg" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ""; }} /></label>
           <button onClick={onClose} className="bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-medium">Done</button>
         </div>
       </div>

@@ -1,7 +1,8 @@
+import type { DashboardViewProps } from "./viewTypes";
 import { useState, useMemo } from "react";
 import { money, fmtDate } from "./helpers";
 
-export function ValuationsTab({ buildingVals, totalVal, totalValPct, appraisals, buildings, editAppraisal }: any) {
+export function ValuationsTab({ canEdit, buildingVals, totalVal, totalValPct, appraisals, buildings, editAppraisal }: Pick<DashboardViewProps, "canEdit" | "buildingVals" | "totalVal" | "totalValPct" | "appraisals" | "buildings" | "editAppraisal">) {
   const [expandedBuilding, setExpandedBuilding] = useState<string | null>(null);
   const [editingVal, setEditingVal] = useState<{ id: number; building: string; field: string; value: string } | null>(null);
 
@@ -43,7 +44,7 @@ export function ValuationsTab({ buildingVals, totalVal, totalValPct, appraisals,
         )}
         {buildings && buildings.length > 0 ? (
           <div className="space-y-3">
-            {buildings.map((b: any) => (
+            {buildings.map((b) => (
               <div key={b.id} className="bg-white rounded-xl border border-stone-200 p-6 text-center">
                 <h3 className="text-sm font-semibold text-stone-700 mb-2" style={{ fontFamily: "'Fraunces', serif" }}>{b.name}</h3>
                 <p className="text-xs text-stone-400">No appraisal data yet. Upload an appraisal to see valuations.</p>
@@ -85,7 +86,7 @@ export function ValuationsTab({ buildingVals, totalVal, totalValPct, appraisals,
       </div>
 
       {/* Per-building cards with history */}
-      {buildingVals.map((bv: any, i: number) => {
+      {buildingVals.map((bv, i: number) => {
         const valPerSqft = bv.sqft > 0 ? bv.value / bv.sqft : 0;
         const history = buildingHistory[bv.name] || [];
         const isExpanded = expandedBuilding === bv.name;
@@ -139,7 +140,7 @@ export function ValuationsTab({ buildingVals, totalVal, totalValPct, appraisals,
                 <div className="divide-y divide-stone-50">
                   {history.map((h, idx) => {
                     const isEditingThis = (f: string) => editingVal?.id === h.id && editingVal?.building === bv.name && editingVal?.field === f;
-                    const startEdit = (f: string, v: string) => setEditingVal({ id: h.id, building: bv.name, field: f, value: v });
+                    const startEdit = (f: string, v: string) => canEdit && setEditingVal({ id: h.id, building: bv.name, field: f, value: v });
                     const saveEdit = () => {
                       if (editingVal) {
                         editAppraisal(editingVal.id, { building_name: editingVal.building, [editingVal.field]: editingVal.value });
