@@ -13,3 +13,7 @@ docker/.env
 backend/.env
 frontend/.env
 
+
+# Local integration worktrees and check output
+.integration/
+lint-results.json

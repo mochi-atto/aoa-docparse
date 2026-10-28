@@ -96,6 +96,12 @@ Run permission regression tests from `backend` with:
 `python -m unittest discover -s tests -p test_rbac.py -v`.
 These tests use an isolated in-memory database and never reset PostgreSQL.
 
+Run all offline backend regressions from `backend` with:
+`python -m unittest discover -s tests -v`.
+The parser tests generate synthetic PDFs and mock AI responses; they do not
+upload sample documents, call OpenAI, send invitation emails, or require native
+Tesseract. Browser OCR itself still needs a browser smoke test.
+
 ### Prerequisites
 
 - Node.js 18+
@@ -216,7 +222,9 @@ Run the server:
 uvicorn app.main:app --reload --port 8000
 ```
 
-Tables are created automatically on first start via `Base.metadata.create_all()`.
+Schema creation and upgrades are explicit. Review `python -m app.migrations`,
+then apply only to an approved target with `python -m app.migrations --apply`.
+The app no longer changes PostgreSQL tables or drops constraints on import.
 
 ### 4. Frontend
 
