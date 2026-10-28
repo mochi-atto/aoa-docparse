@@ -1,6 +1,6 @@
-from fastapi import FastAPI
+from app.logging_filters import configure_access_logging
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import inspect, text
 from app.database import engine, Base
 from app.config import settings
 from app.routers import parishes, upload, data, templates, parish_data, account
@@ -16,35 +16,11 @@ from app.models.building import Building  # noqa
 from app.models.account import Account  # noqa
 from app.models.parish_member import ParishMember  # noqa
 
-# Create all tables
-Base.metadata.create_all(bind=engine)
+# Schema creation and upgrades are explicit; importing the app never changes PostgreSQL.
+if settings.initialize_database:
+    Base.metadata.create_all(bind=engine)
 
-
-def migrate_parish_ownership():
-    inspector = inspect(engine)
-    parish_columns = {column["name"] for column in inspector.get_columns("parishes")}
-    if "owner_account_id" not in parish_columns:
-        with engine.begin() as connection:
-            connection.execute(text(
-                "ALTER TABLE parishes ADD COLUMN owner_account_id INTEGER "
-                "REFERENCES accounts(id)"
-            ))
-            connection.execute(text(
-                "UPDATE parishes p SET owner_account_id = pm.account_id "
-                "FROM parish_members pm "
-                "WHERE pm.parish_id = p.id AND pm.role = 'admin' "
-                "AND pm.account_id IS NOT NULL"
-            ))
-            connection.execute(text(
-                "ALTER TABLE parishes DROP CONSTRAINT IF EXISTS parishes_name_key"
-            ))
-            connection.execute(text(
-                "CREATE UNIQUE INDEX IF NOT EXISTS uq_parish_owner_name "
-                "ON parishes (owner_account_id, name)"
-            ))
-
-
-migrate_parish_ownership()
+configure_access_logging()
 
 app = FastAPI(title="Parish Document Parser API", version="0.1.0")
 
@@ -69,3 +45,15 @@ app.include_router(account.router, prefix="/api/account", tags=["Account"])
 @app.get("/api/health")
 def health_check():
     return {"status": "healthy"}
+
+@app.get("/api/ready")
+def readiness_check():
+    from app.migrations import migrate
+    from sqlalchemy.exc import SQLAlchemyError
+    try:
+        plan = migrate(engine)
+    except SQLAlchemyError:
+        raise HTTPException(status_code=503, detail="Database is temporarily unavailable")
+    if plan["new_tables"] or plan["additive_statements"]:
+        raise HTTPException(status_code=503, detail="Database schema requires an explicit reviewed migration")
+    return {"status": "ready"}

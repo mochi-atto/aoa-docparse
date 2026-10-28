@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from app.database import get_db
 from app.models.parish import Parish
 from app.models.building import Building
@@ -56,7 +57,11 @@ def create_parish(data: ParishCreate, db: Session = Depends(get_db), account=Dep
             if bname.strip():
                 db.add(Building(parish_id=parish.id, name=bname.strip()))
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A parish with this name already exists")
     db.refresh(parish)
     return parish
 
@@ -82,7 +87,11 @@ def update_parish(parish_id: int, data: ParishUpdate, db: Session = Depends(get_
         parish.address = data.address
     if data.image_data is not None:
         parish.image_data = data.image_data
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A parish with this name already exists")
     db.refresh(parish)
     return parish
 

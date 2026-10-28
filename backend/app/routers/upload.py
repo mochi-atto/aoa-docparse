@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.auth import parish_admin_access, parish_access, current_account
@@ -11,15 +12,12 @@ import tempfile
 import os
 
 router = APIRouter()
+MAX_PDF_BYTES = 25 * 1024 * 1024
 
 
 def _serialize_for_json(data: dict) -> dict:
-    """Convert date objects to strings for JSON storage."""
-    result = {**data}
-    for key, val in result.items():
-        if hasattr(val, "isoformat"):
-            result[key] = val.isoformat()
-    return result
+    """Convert dates, including nested appraisal section dates, for JSON storage."""
+    return jsonable_encoder(data)
 
 
 def upload_admin_access(parish_id: int = Form(...), account=Depends(current_account), db: Session = Depends(get_db)):
@@ -35,15 +33,20 @@ async def upload_document(
     db: Session = Depends(get_db),
     membership=Depends(upload_admin_access),
 ):
-    if not file.filename.lower().endswith(".pdf"):
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted")
 
     if doc_type not in ("utility", "appraisal"):
         raise HTTPException(status_code=400, detail="doc_type must be 'utility' or 'appraisal'")
 
+    content = await file.read(MAX_PDF_BYTES + 1)
+    if len(content) > MAX_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="PDF exceeds the 25 MB limit")
+    if not content.startswith(b"%PDF-"):
+        raise HTTPException(status_code=400, detail="The uploaded file is not a PDF")
+
     # Save to temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
 
