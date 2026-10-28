@@ -25,8 +25,8 @@ No `.env` contents are copied into version control.
    type checks, lint and browser checks. Record unavailable live services honestly.
 6. Inspect staged diffs and secret safety, commit logical units and push new branches.
    Unified draft targets `work-order-lifecycle` so PR #1's changes are not duplicated.
-   Merge #1 first after security review, then retarget unified PR to main once its
-   base is present there. No shared merges or force pushes are authorized.
+   Merge #1 first after security review, then retarget unified PR to work-orders
+   and review promotion of that branch to main separately. No shared merges or force pushes are authorized.
 
 Known risks: role-selection and main have no common ancestor; existing unowned
 parishes must not be silently assigned to the first user; SQLAlchemy create_all

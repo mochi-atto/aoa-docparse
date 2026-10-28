@@ -98,12 +98,8 @@ docker compose up -d
 
 This starts PostgreSQL on port 5432. Default config uses trust auth for local development.
 
-If you need to reset the database (drops all data):
-
-```bash
-docker compose down -v
-docker compose up -d
-```
+Local verification must preserve the existing database. Use `docker compose stop`
+to stop PostgreSQL while keeping its data; do not remove the data volume.
 
 ### 2. Backend
 
@@ -129,7 +125,10 @@ Run the server:
 uvicorn app.main:app --reload --port 8000
 ```
 
-Tables are created automatically on first start via `Base.metadata.create_all()`.
+Schema creation and upgrades are explicit. Review `python -m app.migrations`,
+then apply only to an approved target with `python -m app.migrations --apply`.
+App import never alters PostgreSQL tables or removes constraints. Review legacy
+ownership mappings first; use the isolated demo guide for safe local verification.
 
 ### 3. Frontend
 
