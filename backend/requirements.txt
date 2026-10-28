@@ -6,6 +6,7 @@ pydantic-settings==2.3.0
 python-multipart==0.0.9
 python-jose[cryptography]==3.3.0
 alembic==1.13.1
+httpx==0.28.1
 
 # Utility bill parsing (cloud/LLM); OCR runs in the browser via Tesseract.js
 llama-index==0.11.0

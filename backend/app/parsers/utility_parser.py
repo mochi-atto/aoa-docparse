@@ -9,6 +9,7 @@ Supports both text-based PDFs and scanned image PDFs (via OCR).
 import json
 from datetime import date
 from typing import Optional
+import httpx
 import pdfplumber
 from openai import OpenAI
 from app.config import settings
@@ -125,19 +126,21 @@ def _send_to_llm(text: str) -> list[dict]:
     if not text.strip():
         return []
 
-    client = OpenAI(api_key=settings.openai_api_key)
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "system",
-                "content": "You extract structured data from utility bills. Always respond with valid JSON only.",
-            },
-            {"role": "user", "content": EXTRACTION_PROMPT + text},
-        ],
-        temperature=0,
-        response_format={"type": "json_object"},
-    )
+    # OpenAI 1.40's default client passes the removed HTTPX `proxies` argument.
+    # Supplying the transport explicitly supports the pinned HTTPX 0.28 release.
+    with OpenAI(api_key=settings.openai_api_key, http_client=httpx.Client()) as client:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You extract structured data from utility bills. Always respond with valid JSON only.",
+                },
+                {"role": "user", "content": EXTRACTION_PROMPT + text},
+            ],
+            temperature=0,
+            response_format={"type": "json_object"},
+        )
 
     raw_json = response.choices[0].message.content
     parsed = json.loads(raw_json)
@@ -249,7 +252,7 @@ def parse_utility_bill(pdf_path: str, extracted_text: Optional[str] = None) -> l
                 if cleaned.get("bill_date") and cleaned.get("total_amount", 0) > 0:
                     all_bills.append(cleaned)
         except Exception as e:
-            print(f"[Parser] Error on chunk {i + 1}: {e}")
+            print(f"[Parser] Error on chunk {i + 1}: {type(e).__name__}")
             continue
 
     # Deduplicate in case overlapping pages produced the same bill
