@@ -1,5 +1,9 @@
 # AoA Parish Management System
 
+For the unified RBAC, Work Orders and Assets integration, see
+[the review and isolated demo guide](INTEGRATION_REVIEW.md) and
+[verification results](LOCAL_VERIFICATION.md).
+
 A web application for church parishes to upload, parse, and manage utility bills and insurance appraisals. Built with React + FastAPI + PostgreSQL. Currently under development.
 
 ## Overview
