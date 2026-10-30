@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.auth import parish_access, parish_admin_access, require_admin_account
+from app.auth import parish_access, parish_admin_access, current_account
 from app.models.utility_bill import UtilityBill
 from app.models.appraisal import Appraisal
 from app.models.building import Building
@@ -86,11 +86,12 @@ def update_utility_bill(
     bill_id: int,
     data: dict,
     db: Session = Depends(get_db),
-    account=Depends(require_admin_account),
+    account=Depends(current_account),
 ):
     record = db.query(UtilityBill).filter(UtilityBill.id == bill_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Utility bill not found")
+    parish_admin_access(parish_access(record.parish_id, account, db))
 
     changes = []
     editable_str = {"provider_name", "utility_type", "service_address", "building_name", "account_number", "usage_unit"}
@@ -136,10 +137,11 @@ def update_utility_bill(
 
 
 @router.delete("/utility/{bill_id}")
-def delete_utility_bill(bill_id: int, db: Session = Depends(get_db), account=Depends(require_admin_account)):
+def delete_utility_bill(bill_id: int, db: Session = Depends(get_db), account=Depends(current_account)):
     record = db.query(UtilityBill).filter(UtilityBill.id == bill_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Utility bill not found")
+    parish_admin_access(parish_access(record.parish_id, account, db))
     desc = f"Deleted utility bill: {_normalize_util_type(record.utility_type)} ${record.total_amount:.2f} ({record.bill_date})"
     db.add(HistoryEntry(parish_id=record.parish_id, entry_type="task_changed", description=desc))
     db.delete(record)
@@ -195,13 +197,14 @@ def get_appraisal_data(parish_id: int, db: Session = Depends(get_db), membership
 
 
 @router.put("/appraisal/{appraisal_id}")
-def update_appraisal(appraisal_id: int, data: dict, db: Session = Depends(get_db), account=Depends(require_admin_account)):
+def update_appraisal(appraisal_id: int, data: dict, db: Session = Depends(get_db), account=Depends(current_account)):
     """Edit an appraisal record. Updates both the DB record and the raw_extracted sections."""
     from datetime import date as date_type
 
     record = db.query(Appraisal).filter(Appraisal.id == appraisal_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Appraisal not found")
+    parish_admin_access(parish_access(record.parish_id, account, db))
 
     changes = []
 
@@ -284,10 +287,11 @@ def update_appraisal(appraisal_id: int, data: dict, db: Session = Depends(get_db
 
 
 @router.delete("/appraisal/{appraisal_id}")
-def delete_appraisal(appraisal_id: int, db: Session = Depends(get_db), account=Depends(require_admin_account)):
+def delete_appraisal(appraisal_id: int, db: Session = Depends(get_db), account=Depends(current_account)):
     record = db.query(Appraisal).filter(Appraisal.id == appraisal_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Appraisal not found")
+    parish_admin_access(parish_access(record.parish_id, account, db))
     desc = f"Deleted appraisal: {record.entity_name or 'Unknown'} ({record.appraisal_date})"
     db.add(HistoryEntry(parish_id=record.parish_id, entry_type="task_changed", description=desc))
     db.delete(record)
@@ -296,12 +300,14 @@ def delete_appraisal(appraisal_id: int, db: Session = Depends(get_db), account=D
 
 
 @router.post("/appraisal/manual")
-def create_appraisal_manual(data: dict, db: Session = Depends(get_db), account=Depends(require_admin_account)):
+def create_appraisal_manual(data: dict, db: Session = Depends(get_db), account=Depends(current_account)):
     from datetime import date as date_type
 
     parish_id = data.get("parish_id")
     if not parish_id:
         raise HTTPException(status_code=400, detail="parish_id is required")
+
+    parish_admin_access(parish_access(parish_id, account, db))
 
     appraisal_date = None
     if data.get("appraisal_date"):
@@ -357,11 +363,12 @@ def create_appraisal_manual(data: dict, db: Session = Depends(get_db), account=D
 # ── Mark history as removed ──
 
 @router.post("/history/{entry_id}/mark-removed")
-def mark_history_removed(entry_id: int, db: Session = Depends(get_db), account=Depends(require_admin_account)):
+def mark_history_removed(entry_id: int, db: Session = Depends(get_db), account=Depends(current_account)):
     """Mark a history entry as 'removed' (data was deleted) without deleting the entry itself."""
     entry = db.query(HistoryEntry).filter(HistoryEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="History entry not found")
+    parish_admin_access(parish_access(entry.parish_id, account, db))
     entry.undone = "removed"
     db.commit()
     return {"detail": "Marked as removed"}

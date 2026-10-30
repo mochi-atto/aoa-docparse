@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     smtp_from: str = ""
     frontend_url: str = "http://localhost:5173"
 
+    initialize_database: bool = False
+
     class Config:
         env_file = ".env"
 

@@ -78,15 +78,29 @@ parish-document-parser/
 
 ### Parish roles
 
-Authentication uses two local roles. The first person to authenticate without a
-pending invitation is automatically an administrator. Administrators can manage
-parish data and use **Add Viewer** on a parish dashboard to invite a viewer by
-email. The invitation link must be used with the invited email address.
-Viewers can read parish information but all data mutations are rejected by the
-API.
+Parish membership determines access: **Admin** manages parish data and members,
+**Editor / Technician** creates and updates maintenance tasks, and **Viewer** has
+read-only access. A user's role can differ between parishes. The last active
+administrator cannot be removed or demoted.
 
-Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
-`SMTP_FROM`, and `FRONTEND_URL` in `backend/.env` to enable invitation email.
+Administrators open **Manage Members** on the dashboard to list members, change
+roles, remove access, or generate an invitation for an editor or viewer. When
+`FRONTEND_URL` points to localhost and SMTP is unavailable, a copyable invitation
+link is returned to the administrator; no email is claimed to have been sent.
+On production URLs, SMTP must be configured. Configure `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, and `FRONTEND_URL` for email delivery.
+Recipients sign in with Auth0 using the invited email and click **Accept
+Invitation**. Tokens are single-use and are never returned by member lists.
+
+Run permission regression tests from `backend` with:
+`python -m unittest discover -s tests -p test_rbac.py -v`.
+These tests use an isolated in-memory database and never reset PostgreSQL.
+
+Run all offline backend regressions from `backend` with:
+`python -m unittest discover -s tests -v`.
+The parser tests generate synthetic PDFs and mock AI responses; they do not
+upload sample documents, call OpenAI, send invitation emails, or require native
+Tesseract. Browser OCR itself still needs a browser smoke test.
 
 ### Prerequisites
 
@@ -165,14 +179,8 @@ To stop and remove the container while keeping its data volume:
 docker compose down
 ```
 
-If you need to reset the database (drops all data):
-
-```bash
-docker compose down -v
-docker compose up -d
-```
-
-The reset command permanently deletes the PostgreSQL volume. Only use it for a fresh local setup or when instructed by the project maintainer.
+Local verification must preserve the existing database. Use `docker compose stop`
+to stop PostgreSQL while keeping its data; do not remove the data volume.
 
 ### 3. Backend
 
@@ -208,7 +216,9 @@ Run the server:
 uvicorn app.main:app --reload --port 8000
 ```
 
-Tables are created automatically on first start via `Base.metadata.create_all()`.
+Schema creation and upgrades are explicit. Review `python -m app.migrations`,
+then apply only to an approved target with `python -m app.migrations --apply`.
+The app no longer changes PostgreSQL tables or drops constraints on import.
 
 ### 4. Frontend
 

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from app.database import get_db
 from app.models.parish import Parish
 from app.models.building import Building
@@ -15,9 +16,15 @@ router = APIRouter()
 
 @router.get("/", response_model=List[ParishResponse])
 def list_parishes(db: Session = Depends(get_db), account=Depends(current_account)):
-    return db.query(Parish).join(Parish.members).filter(
-        Parish.members.any(account_id=account.id)
-    ).all()
+    from app.models.parish_member import ParishMember
+    rows = db.query(Parish, ParishMember.role).join(Parish.members).filter(
+        ParishMember.account_id == account.id).all()
+    result = []
+    for parish, role in rows:
+        response = ParishResponse.model_validate(parish)
+        response.role = role
+        result.append(response)
+    return result
 
 
 @router.post("/", response_model=ParishResponse)
@@ -50,7 +57,11 @@ def create_parish(data: ParishCreate, db: Session = Depends(get_db), account=Dep
             if bname.strip():
                 db.add(Building(parish_id=parish.id, name=bname.strip()))
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A parish with this name already exists")
     db.refresh(parish)
     return parish
 
@@ -76,7 +87,11 @@ def update_parish(parish_id: int, data: ParishUpdate, db: Session = Depends(get_
         parish.address = data.address
     if data.image_data is not None:
         parish.image_data = data.image_data
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A parish with this name already exists")
     db.refresh(parish)
     return parish
 
