@@ -32,6 +32,7 @@ class ParishUpdate(BaseModel):
     image_data: Optional[str] = None
 
 class ParishResponse(BaseModel):
+    role: Optional[str] = None
     id: int
     name: str
     diocese: Optional[str]

@@ -1,25 +1,28 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.auth import verify_token
+from app.auth import parish_admin_access, parish_access, current_account
 from app.schemas.documents import UploadResponse
 from app.parsers.utility_parser import parse_utility_bill
 from app.parsers.appraisal_parser import parse_appraisal
 from app.models.utility_bill import UtilityBill
 from app.models.appraisal import Appraisal
+from app.models.history_entry import HistoryEntry
 import tempfile
 import os
 
 router = APIRouter()
+MAX_PDF_BYTES = 25 * 1024 * 1024
 
 
 def _serialize_for_json(data: dict) -> dict:
-    """Convert date objects to strings for JSON storage."""
-    result = {**data}
-    for key, val in result.items():
-        if hasattr(val, "isoformat"):
-            result[key] = val.isoformat()
-    return result
+    """Convert dates, including nested appraisal section dates, for JSON storage."""
+    return jsonable_encoder(data)
+
+
+def upload_admin_access(parish_id: int = Form(...), account=Depends(current_account), db: Session = Depends(get_db)):
+    return parish_admin_access(parish_access(parish_id, account, db))
 
 
 @router.post("/", response_model=UploadResponse)
@@ -29,17 +32,22 @@ async def upload_document(
     doc_type: str = Form(...),  # "utility" or "appraisal"
     extracted_text: str | None = Form(None),
     db: Session = Depends(get_db),
-    user=Depends(verify_token),
+    membership=Depends(upload_admin_access),
 ):
-    if not file.filename.lower().endswith(".pdf"):
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted")
 
     if doc_type not in ("utility", "appraisal"):
         raise HTTPException(status_code=400, detail="doc_type must be 'utility' or 'appraisal'")
 
+    content = await file.read(MAX_PDF_BYTES + 1)
+    if len(content) > MAX_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="PDF exceeds the 25 MB limit")
+    if not content.startswith(b"%PDF-"):
+        raise HTTPException(status_code=400, detail="The uploaded file is not a PDF")
+
     # Save to temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
 
@@ -67,6 +75,8 @@ async def upload_document(
                     original_filename=file.filename,
                     provider_name=bill.get("provider_name"),
                     utility_type=bill.get("utility_type"),
+                    service_address=bill.get("service_address"),
+                    building_name=bill.get("building_name"),
                     bill_date=bill.get("bill_date"),
                     due_date=bill.get("due_date"),
                     billing_period_start=bill.get("billing_period_start"),
@@ -81,6 +91,11 @@ async def upload_document(
                 db.add(record)
                 records_created += 1
 
+            db.add(HistoryEntry(
+                parish_id=parish_id, entry_type="upload",
+                description=f"Utility upload: {file.filename} ({records_created} records)",
+                snapshot={"actor_sub": membership.account.auth0_sub},
+            ))
             db.commit()
 
             # Build a descriptive message
@@ -124,13 +139,14 @@ async def upload_document(
             from app.models.extraction_template import ExtractionTemplate
             template_record = (
                 db.query(ExtractionTemplate)
-                .filter(ExtractionTemplate.is_default == True)
+                .filter(ExtractionTemplate.is_default == True, ExtractionTemplate.parish_id == parish_id)
                 .first()
             )
             if not template_record:
                 # Fall back to any template
                 template_record = (
                     db.query(ExtractionTemplate)
+                    .filter(ExtractionTemplate.parish_id == parish_id)
                     .order_by(ExtractionTemplate.updated_at.desc())
                     .first()
                 )
@@ -168,6 +184,11 @@ async def upload_document(
                 raw_extracted=raw_for_json,
             )
             db.add(record)
+            db.add(HistoryEntry(
+                parish_id=parish_id, entry_type="upload",
+                description=f"Appraisal upload: {file.filename}",
+                snapshot={"actor_sub": membership.account.auth0_sub},
+            ))
             db.commit()
 
             cost = extracted.get("cost_of_replacement_new")

@@ -1,9 +1,23 @@
-node_modules/\n__pycache__/\n.env\n*.pyc\nvenv/\n.next/
+node_modules/
+venv/
+.venv/
+.next/
+.env.*
+!.env.example
+.DS_Store
 .env
-\venv
 __pycache__/
 *.pyc
 *.pyo
 
 # TEMPORARY local asset document storage
 backend/uploads/
+
+# Isolated verification artifacts and demo data
+lint-results.json
+.demo/
+*.sqlite
+*.sqlite3
+
+# Local integration worktrees and check output
+.integration/
