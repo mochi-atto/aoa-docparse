@@ -7,4 +7,4 @@ export interface WorkOrder { id: number; display_number: string; building_id: nu
 export type WorkOrderPriority = "low" | "medium" | "high" | "urgent";
 export interface HistoryEntry { id: number; type: string; description: string; date: string; undone?: string; user_email?: string; user_name?: string; }
 
-export type TabKey = "dashboard" | "utility" | "valuations" | "risks" | "finances" | "history";
+export type TabKey = "dashboard" | "assets" | "utility" | "valuations" | "risks" | "finances" | "history";

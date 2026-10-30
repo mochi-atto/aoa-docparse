@@ -6,6 +6,7 @@ import { extractUtilityText } from "../services/browserOcr";
 import type { BuildingData, Parish, UtilityBill, Appraisal, TodoItem, WorkOrder, WorkOrderPriority, HistoryEntry, TabKey } from "./dashboard/types";
 import { UTIL_TYPES, BAR_COLORS, TABS } from "./dashboard/constants";
 import { fmtDate, fmtMonth, fmtMonthLong, monthKey, bldgName } from "./dashboard/helpers";
+import AssetsTab from "../components/AssetsTab";
 import { DashboardTab } from "./dashboard/DashboardTab";
 import { FinancesTab } from "./dashboard/FinancesTab";
 import { HistoryTab } from "./dashboard/HistoryTab";
@@ -132,6 +133,15 @@ export default function DashboardPage() {
       const res = await api.post(`/parishes/${parishId}/history`, { entry_type: type, description });
       const h = res.data;
       setHistory((prev) => [{ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name }, ...prev]);
+    } catch { /* silent */ }
+  }, [parishId, getAccessTokenSilently]);
+
+  const refreshHistory = useCallback(async () => {
+    try {
+      const token = await getAccessTokenSilently();
+      setAuthToken(token);
+      const res = await api.get(`/parishes/${parishId}/history`);
+      setHistory(res.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
     } catch { /* silent */ }
   }, [parishId, getAccessTokenSilently]);
 
@@ -781,6 +791,7 @@ export default function DashboardPage() {
             setEditTaskText={setEditTaskText} setEditTaskPriority={setEditTaskPriority} setEditTaskBuilding={setEditTaskBuilding} deleteTask={deleteTask}
             workOrders={workOrders} createWorkOrder={createWorkOrder}
           />}
+          {activeTab === "assets" && <AssetsTab parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} showToast={showToast} onChanged={refreshHistory} />}
           {activeTab === "utility" && <UtilityTab utilities={utilities} utilBuildings={utilBuildings} utilBuildingData={utilBuildingData} allMonths={allMonths} buildings={buildings} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} setBuildings={setBuildings} refreshData={refreshData} editUtilityBill={editUtilityBill} deleteUtilityBill={deleteUtilityBill} showToast={showToast} />}
           {activeTab === "valuations" && <ValuationsTab buildingVals={buildingVals} totalVal={totalVal} totalValPct={totalValPct} appraisals={appraisals} buildings={buildings} editAppraisal={editAppraisal} />}
           {activeTab === "finances" && <FinancesTab utilities={utilities} estMonthly={estMonthly} bldgFinances={bldgFinances} todos={todos} />}

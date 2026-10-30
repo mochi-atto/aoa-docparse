@@ -27,6 +27,7 @@ export const BAR_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"
 
 export const TABS: { key: TabKey; label: string }[] = [
   { key: "dashboard",  label: "Dashboard" },
+  { key: "assets",     label: "Assets" },
   { key: "utility",    label: "Utility Use" },
   { key: "valuations", label: "Building Valuations" },
   { key: "risks",      label: "Active Risks" },
