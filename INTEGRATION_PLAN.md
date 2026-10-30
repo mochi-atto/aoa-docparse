@@ -1,5 +1,9 @@
 # AoA integration execution plan
 
+Historical plan for PRs #2 and #3. Those PRs are now merged into their feature
+targets. The current promotion to main is documented in
+[UNIFIED_INTEGRATION.md](UNIFIED_INTEGRATION.md); do not follow the old PR order below.
+
 Original worktree and database remain intact. Local-only parser/test/label fixes
 and LOCAL_VERIFICATION.md have been copied into `.integration/role-hardening`.
 No `.env` contents are copied into version control.

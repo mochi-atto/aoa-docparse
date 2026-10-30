@@ -40,7 +40,7 @@ export default function ParishSelectPage() {
         setAuthToken(token);
         const res = await api.get("/parishes/");
         setParishes(res.data);
-      } catch (err) { console.error(err); }
+      } catch (err) { setError(errorDetail(err) || "Could not load parishes. Please try again."); }
       finally { setLoading(false); }
     })();
   }, [getAccessTokenSilently]);
@@ -115,6 +115,7 @@ export default function ParishSelectPage() {
           </div>
 
           {/* Parish list */}
+          {error && !showCreate && <p role="alert" className="text-sm text-red-600 mb-4">{error}</p>}
           {loading ? (
             <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" /></div>
           ) : (

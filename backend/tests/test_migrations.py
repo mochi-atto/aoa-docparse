@@ -35,9 +35,10 @@ class MigrationTests(unittest.TestCase):
             connection.execute(text("INSERT INTO parishes (id, name) VALUES (7, 'Synthetic existing parish')"))
             connection.execute(text("CREATE TABLE todos (id INTEGER PRIMARY KEY)"))
             connection.execute(text("CREATE TABLE work_orders (id INTEGER PRIMARY KEY)"))
-        self.assertEqual(len(migrate(engine)["additive_statements"]), 2)
+        self.assertEqual(len(migrate(engine)["additive_statements"]), 3)
         migrate(engine, apply=True)
         with engine.connect() as connection:
             self.assertEqual(connection.execute(text("SELECT name FROM parishes WHERE id=7")).scalar(), "Synthetic existing parish")
             self.assertIsNone(connection.execute(text("SELECT owner_account_id FROM parishes WHERE id=7")).scalar())
         self.assertIn("todo_id", {c["name"] for c in inspect(engine).get_columns("work_orders")})
+        self.assertIn("status_before_hold", {c["name"] for c in inspect(engine).get_columns("work_orders")})

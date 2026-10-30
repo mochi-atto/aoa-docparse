@@ -23,9 +23,16 @@ def get_signing_key():
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Verify the Auth0 JWT and return the decoded payload."""
     token = credentials.credentials
+    if not settings.auth0_domain or not settings.auth0_api_audience:
+        raise HTTPException(status_code=503, detail="Authentication is not configured")
     try:
         unverified_header = jwt.get_unverified_header(token)
         jwks = get_signing_key()
+
+        # Auth0 rotates keys. Refresh once when the cached set lacks this key.
+        if not any(key.get("kid") == unverified_header.get("kid") for key in jwks["keys"]):
+            get_signing_key.cache_clear()
+            jwks = get_signing_key()
 
         rsa_key = {}
         for key in jwks["keys"]:
@@ -47,6 +54,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
             algorithms=[settings.auth0_algorithms],
             audience=settings.auth0_api_audience,
             issuer=f"https://{settings.auth0_domain}/",
+            options={"require_exp": True, "require_sub": True},
         )
         return payload
 

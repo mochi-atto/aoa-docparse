@@ -153,6 +153,55 @@ class IntegrationTests(unittest.TestCase):
         bills = [{"service_address": "Synthetic", "bill_date": "2026-01-01", "total_amount": 10, "utility_type": kind} for kind in ["water", "waste"]]
         self.assertEqual(len(_deduplicate_bills(bills)), 2)
 
+    def test_utility_upload_preserves_building_and_audits_actor(self):
+        from datetime import date
+        from app.models.utility_bill import UtilityBill
+        from app.routers import upload
+        bill = {"bill_date": date(2026, 1, 1), "total_amount": 42.5,
+                "service_address": "123 Synthetic Street", "building_name": "Demo Hall",
+                "utility_type": "electric"}
+        with patch.object(upload, "parse_utility_bill", return_value=[bill]):
+            response = self.client.post("/upload/", data={"parish_id": "1", "doc_type": "utility"},
+                files={"file": ("synthetic.pdf", b"%PDF-synthetic", "application/pdf")})
+        self.assertEqual(response.status_code, 200, response.text)
+        with self.sessions() as db:
+            stored = db.query(UtilityBill).filter_by(parish_id=1).one()
+            self.assertEqual(stored.service_address, bill["service_address"])
+            self.assertEqual(stored.building_name, bill["building_name"])
+            audit = db.query(HistoryEntry).filter_by(parish_id=1, entry_type="upload").one()
+            self.assertEqual(audit.snapshot["actor_sub"], "user1")
+        self.assertEqual(self.client.get("/data/utility/1").json()[0]["building_name"], "Demo Hall")
+
+    def test_appraisal_edit_and_asset_register_coexist_with_roles(self):
+        body = {"parish_id": 1, "entity_name": "Synthetic parish", "appraisal_date": "2026-01-01",
+                "buildings": [{"name": "Hall", "building_value": 1000, "gross_sq_ft": 200}]}
+        created = self.client.post("/data/appraisal/manual", json=body)
+        self.assertEqual(created.status_code, 200, created.text)
+        appraisal = created.json()["id"]
+        asset = self.asset().json()["id"]
+        for user, expected in [(2, 403), (3, 403), (4, 404), (1, 200)]:
+            self.login(user)
+            response = self.client.put(f"/data/appraisal/{appraisal}", json={"building_name": "Hall", "building_value": 1500})
+            self.assertEqual(response.status_code, expected, response.text)
+        self.assertEqual(self.client.get("/data/appraisal/1").json()[0]["building_value"], 1500)
+        self.assertEqual(self.client.get("/parishes/1/assets").json()[0]["id"], asset)
+
+    def test_api_routes_have_no_duplicate_method_and_path(self):
+        from app.main import app
+        seen = set()
+        for route in app.routes:
+            for method in getattr(route, "methods", []):
+                key = (method, route.path)
+                self.assertNotIn(key, seen)
+                seen.add(key)
+
+    def test_created_parish_immediately_reports_its_admin_role(self):
+        response = self.client.post("/parishes/", json={"name": "Synthetic new parish", "buildings": ["Hall"]})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["role"], "admin")
+        parish = response.json()["id"]
+        self.assertEqual(self.client.get(f"/parishes/{parish}").json()["role"], "admin")
+
     def test_asset_cost_and_install_year_edge_cases(self):
         import datetime
         asset = self.asset().json()["id"]

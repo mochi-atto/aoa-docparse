@@ -8,6 +8,7 @@ from app.parsers.utility_parser import parse_utility_bill
 from app.parsers.appraisal_parser import parse_appraisal
 from app.models.utility_bill import UtilityBill
 from app.models.appraisal import Appraisal
+from app.models.history_entry import HistoryEntry
 import tempfile
 import os
 
@@ -74,6 +75,8 @@ async def upload_document(
                     original_filename=file.filename,
                     provider_name=bill.get("provider_name"),
                     utility_type=bill.get("utility_type"),
+                    service_address=bill.get("service_address"),
+                    building_name=bill.get("building_name"),
                     bill_date=bill.get("bill_date"),
                     due_date=bill.get("due_date"),
                     billing_period_start=bill.get("billing_period_start"),
@@ -88,6 +91,11 @@ async def upload_document(
                 db.add(record)
                 records_created += 1
 
+            db.add(HistoryEntry(
+                parish_id=parish_id, entry_type="upload",
+                description=f"Utility upload: {file.filename} ({records_created} records)",
+                snapshot={"actor_sub": membership.account.auth0_sub},
+            ))
             db.commit()
 
             # Build a descriptive message
@@ -176,6 +184,11 @@ async def upload_document(
                 raw_extracted=raw_for_json,
             )
             db.add(record)
+            db.add(HistoryEntry(
+                parish_id=parish_id, entry_type="upload",
+                description=f"Appraisal upload: {file.filename}",
+                snapshot={"actor_sub": membership.account.auth0_sub},
+            ))
             db.commit()
 
             cost = extracted.get("cost_of_replacement_new")

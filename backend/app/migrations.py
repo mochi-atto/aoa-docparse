@@ -22,6 +22,8 @@ def pending(connection):
         changes.append("ALTER TABLE parishes ADD COLUMN owner_account_id INTEGER REFERENCES accounts(id)")
     if "work_orders" in tables and "todo_id" not in {c["name"] for c in schema.get_columns("work_orders")}:
         changes.append("ALTER TABLE work_orders ADD COLUMN todo_id INTEGER REFERENCES todos(id) ON DELETE SET NULL")
+    if "work_orders" in tables and "status_before_hold" not in {c["name"] for c in schema.get_columns("work_orders")}:
+        changes.append("ALTER TABLE work_orders ADD COLUMN status_before_hold VARCHAR")
     if "extraction_templates" in tables and "parish_id" not in {c["name"] for c in schema.get_columns("extraction_templates")}:
         changes.append("ALTER TABLE extraction_templates ADD COLUMN parish_id INTEGER REFERENCES parishes(id)")
     return changes
@@ -33,8 +35,9 @@ def migrate(target, apply=False):
         changes = pending(connection)
         missing = sorted(set(Base.metadata.tables) - set(inspect(connection).get_table_names()))
         if apply:
-            # Accounts must exist before the legacy parish owner foreign key.
-            Base.metadata.tables["accounts"].create(connection, checkfirst=True)
+            # Create referenced tables before adding foreign keys to legacy tables.
+            # create_all leaves existing tables and their records untouched.
+            Base.metadata.create_all(connection)
             for statement in changes:
                 connection.execute(text(statement))
             Base.metadata.create_all(connection)

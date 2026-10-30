@@ -9,6 +9,19 @@ export const setAuthToken = (token: string) => {
   api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 };
 
+// Ask Auth0 for a current token on every request, including long-lived dashboard
+// sessions. The SDK caches valid tokens and renews them before expiry.
+export function attachAuthToken(getToken: () => Promise<string>) {
+  const interceptor = api.interceptors.request.use(async config => {
+    config.headers.set("Authorization", `Bearer ${await getToken()}`);
+    return config;
+  });
+  return () => {
+    api.interceptors.request.eject(interceptor);
+    delete api.defaults.headers.common["Authorization"];
+  };
+}
+
 export default api;
 export type ParishRole = "admin" | "editor" | "viewer";
 export interface ParishMember {

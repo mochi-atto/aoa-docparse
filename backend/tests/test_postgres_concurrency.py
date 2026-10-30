@@ -97,3 +97,26 @@ class PostgresConcurrencyTests(unittest.TestCase):
         self.assertEqual(results, [200, 200])
         with self.sessions() as db:
             self.assertEqual(db.query(Account).filter_by(auth0_sub="synthetic5").count(), 1)
+
+    def test_legacy_upgrade_preserves_records_and_creates_fk_targets(self):
+        # A second synthetic schema models an old installation without todos.
+        schema = "aoa_legacy_" + uuid.uuid4().hex
+        with self.engine.begin() as connection:
+            connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+        legacy = create_engine(os.environ["TEST_POSTGRES_URL"],
+            connect_args={"options": f"-csearch_path={schema}"})
+        self.addCleanup(legacy.dispose)
+        with legacy.begin() as connection:
+            connection.execute(text("CREATE TABLE parishes (id INTEGER PRIMARY KEY, name VARCHAR NOT NULL UNIQUE, diocese VARCHAR, address VARCHAR, image_data TEXT, created_at TIMESTAMP)"))
+            connection.execute(text("INSERT INTO parishes (id, name) VALUES (7, 'Synthetic preserved parish')"))
+            connection.execute(text("CREATE TABLE work_orders (id INTEGER PRIMARY KEY, title VARCHAR)"))
+            connection.execute(text("INSERT INTO work_orders (id, title) VALUES (9, 'Synthetic preserved order')"))
+        plan = migrate(legacy)
+        self.assertEqual(len(plan["additive_statements"]), 3)
+        migrate(legacy, apply=True)
+        self.assertEqual(migrate(legacy)["additive_statements"], [])
+        with legacy.connect() as connection:
+            self.assertEqual(connection.execute(text("SELECT name FROM parishes WHERE id=7")).scalar(), "Synthetic preserved parish")
+            self.assertEqual(connection.execute(text("SELECT title FROM work_orders WHERE id=9")).scalar(), "Synthetic preserved order")
+            self.assertIsNone(connection.execute(text("SELECT owner_account_id FROM parishes WHERE id=7")).scalar())
+            self.assertIsNone(connection.execute(text("SELECT status_before_hold FROM work_orders WHERE id=9")).scalar())

@@ -1,136 +1,122 @@
-# Unified parish application: review and demo
+# Unified application setup and rollout
 
-## Histories and attribution
+See [UNIFIED_INTEGRATION.md](UNIFIED_INTEGRATION.md) for contributor history and
+[LOCAL_VERIFICATION.md](LOCAL_VERIFICATION.md) for executed checks.
 
-The original `rayeed-role-management` worktree and its uncommitted files remain
-intact. Its complete Account/ParishMember, Auth0 identity, invitations, parish
-ownership, scoped data/task APIs, and member/selection/invitation UI foundation
-were manually ported. The unrelated histories were never forced together.
+## Apple Silicon local setup
 
-This branch starts on `main` at df0c011, preserves Eric's Assets commits through
-a related-history merge of `eric-assets` at 9d0832a, and includes the existing
-work-order-lifecycle commits through a related-history merge at f86d39e. Main's
-split dashboard, saved user profiles, work-order/task links, and current-charge,
-water/sewer and multi-service parser fixes are preserved. Eric's register,
-replacement planning, heuristics, catalog and document holder remain his design.
+Use Homebrew Python 3.11 and Node 22.18+; Docker Desktop runs PostgreSQL 16
+natively on ARM64. The frontend and backend run natively on macOS. Do not
+replace an existing environment file or reuse an unknown database volume.
 
-## Permission policy for team review
+```bash
+# Repository root; create files only when they do not already exist.
+cp -n docker/.env.example docker/.env
+cp -n backend/.env.example backend/.env
+cp -n frontend/.env.example frontend/.env
+/opt/homebrew/bin/python3.11 -m venv backend/venv
+backend/venv/bin/python -m pip install -r backend/requirements.txt
+npm --prefix frontend ci
+```
 
-| Operation | Admin | Editor / Technician | Viewer |
+Set local database credentials in docker/.env and the matching DATABASE_URL in
+backend/.env. For this Mac's existing development setup, always use the same
+Compose project name so a second volume is not accidentally selected:
+
+```bash
+docker compose -p aoa-docparse-local -f docker/docker-compose.yml up -d
+```
+
+For a new, empty, approved database, review and explicitly apply the schema:
+
+```bash
+cd backend
+venv/bin/python -m app.migrations
+venv/bin/python -m app.migrations --apply
+```
+
+Run in two terminals:
+
+```bash
+cd backend
+venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+```bash
+cd frontend
+npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
+```
+
+Open http://localhost:5173 and http://localhost:8000/docs. Health is
+/api/health; /api/ready checks database connectivity and the known migration plan
+without modifying tables. Use `docker compose -p aoa-docparse-local -f
+docker/docker-compose.yml stop` to preserve the development volume.
+
+## Credentials and authentication
+
+Backend requires DATABASE_URL. Auth0 sign-in requires AUTH0_DOMAIN and
+AUTH0_API_AUDIENCE, plus matching VITE_AUTH0_DOMAIN, VITE_AUTH0_CLIENT_ID and
+VITE_AUTH0_AUDIENCE in frontend/.env. AUTH0_ALGORITHMS defaults to RS256.
+Request scopes are openid/profile/email. Verified email is required for invitation
+acceptance, with authenticated Auth0 userinfo fallback when needed. API requests
+obtain current SDK tokens; failures are surfaced instead of silently hiding modules.
+
+Register the SPA callback http://localhost:5173/callback and web/logout origin
+http://localhost:5173 in Auth0. If using isolated ports 5174/8001, register
+http://localhost:5174/callback and the 5174 origins too. Restart Vite after changing
+frontend environment values. VITE_API_BASE_URL is not used: /api is proxied by
+Vite; AOA_API_TARGET optionally changes the target (default localhost:8000).
+Production hosting must route /api to the backend as well.
+
+OPENAI_API_KEY is required only for utility extraction. Appraisals use local
+PDF processing/manual entry. Invitations return a shareable link on localhost;
+production email requires SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD,
+SMTP_FROM and FRONTEND_URL. Configure ALLOWED_ORIGINS to the actual frontend.
+ASSET_UPLOAD_DIR selects private persistent document storage. Never commit .env.
+
+## Permission policy
+
+| Operation | Admin | Editor | Viewer |
 | --- | --- | --- | --- |
-| Read authorized parish data, orders, assets, documents | Yes | Yes | Yes |
-| Manage parish, members, buildings, bills, appraisals, templates | Yes | No | No |
-| Create/update maintenance tasks | Yes | Yes | No |
-| Delete tasks | Yes | No | No |
-| Create/claim work orders | Yes | Yes | No |
+| Read parish data, orders, assets, documents | Yes | Yes | Yes |
+| Manage parish, members, bills, appraisals, templates | Yes | No | No |
+| Create/update maintenance tasks; create/claim orders | Yes | Yes | No |
 | Start/hold/resume/submit orders | Any parish order | Own assigned order | No |
-| Close submitted order after review | Yes | No | No |
-| Create/update/delete asset register and financial accruals | Yes | No | No |
-| Attach/remove asset maintenance documents/catalog names | Yes | Yes | No |
+| Review/close submitted orders; delete tasks | Yes | No | No |
+| Change asset register and financial values | Yes | No | No |
+| Attach/remove asset maintenance documents | Yes | Yes | No |
 
-Every scoped API checks membership server-side; nonmembers receive 404. Global
-profile endpoints operate only on the authenticated subject. Templates are now
-parish-scoped too, including defaults and the upload parser's template selection.
-Team confirmation is requested for Admin-only close/asset financial edits and
-Editor document removal. UI controls follow this policy; backend checks remain
-authoritative. Audit entries retain actor identity snapshots.
+Roles are parish-specific; the selector displays the effective membership role.
+The member-management UI assigns roles through authenticated Admin actions.
+Users cannot self-select a privileged role. Nonmembers receive 404 for scoped
+resources. Seven-day invitations are hashed, verified-email matched and single-use.
+The final Admin is protected with PostgreSQL locking. Work-order claim and
+numbering use database locks. Audit entries record membership, lifecycle and
+upload events; no invitation secrets are listed.
 
-Invitations expire after seven days using their existing creation timestamp.
-New tokens are stored as SHA-256 digests; existing raw tokens remain accepted
-within the same expiry window. Verified Auth0 email is required. Tokens are
-single-use, never listed, and no GET implicitly accepts an invitation. Expired
-entries can be removed by an Admin before generating a replacement. Last-admin
-changes and order numbering/claims use PostgreSQL row locks.
+## Existing database rollout
 
-## Database rollout
+This integration does not migrate the existing development volume or any shared
+or production database. On a disposable database it verifies creation of 13
+application tables and additive legacy migrations. The plan adds missing
+parishes.owner_account_id, work_orders.todo_id, work_orders.status_before_hold,
+and extraction_templates.parish_id. Referenced tables are created first.
+No tables, constraints or records are removed, and repeat application is safe.
+The plan covers known repository schemas, not arbitrary historical schema drift.
 
-`app.main` no longer migrates PostgreSQL when imported. `python -m app.migrations`
-prints a plan; `--apply` is explicit. The migration creates missing tables and
-adds nullable parish ownership, work-order todo linkage, and template parish
-ownership columns where required. It does not drop tables/constraints, clear
-rows, or assign existing parishes/templates to an arbitrary first user.
+Before upgrading a populated database, back it up, inventory its schema, review
+the dry-run, and approve explicit owner/member/template mappings. Unowned legacy
+parishes and global templates stay inaccessible until mapped; they are never
+assigned to the first user. Existing global parish-name uniqueness is retained.
+A conflicting create returns HTTP 409. Relaxing that constraint requires a
+separate reviewed migration.
 
-Before a real rollout, take a database backup, review the plan, inventory legacy
-schema differences, and approve an explicit owner/member/template mapping.
-Unowned legacy records remain inaccessible. Existing global parish-name unique
-constraints are retained, so legacy installations can still reject names used
-by another owner with HTTP 409. Relaxing that constraint needs a separate reviewed
-migration. SQLite and disposable PostgreSQL checks do not replace rollout review.
+## Deployment limits
 
-No integration migration was applied to the existing `parish_db` database.
-
-## Run the isolated demo
-
-From this integration worktree, with `aoa-dev` activated and dependencies installed (the Python launcher works without changing Windows PowerShell execution policy):
-
-```powershell
-python .\scripts\run_demo.py prepare --configuration-root C:\Users\rayee\Documents\aoa-docparse
-```
-
-Run each server in its own PowerShell window:
-
-```powershell
-python .\scripts\run_demo.py backend --configuration-root C:\Users\rayee\Documents\aoa-docparse
-python .\scripts\run_demo.py frontend --configuration-root C:\Users\rayee\Documents\aoa-docparse
-```
-
-The helper reads the existing private environment files without changing them.
-It forces the API to `.demo/demo.sqlite`, on port 8001, and Vite to 5174. Prepare
-refuses to overwrite an existing database. On reuse, only the isolated demo's
-explicit additive migration runs. Synthetic parish, building, boiler, task and
-work-order data are seeded; an existing local administrator's sign-in identity
-may be copied read-only for Auth0 access. No real parish documents are copied.
-
-Open http://localhost:5174, sign in yourself, select Synthetic Demo Parish, and
-inspect Assets and Active Risks / Work Orders. Claim, start, hold/resume, submit
-with completion notes, then close as Admin. The generated synthetic PDF is under
-`.demo/synthetic-appraisal.pdf`; use it for local appraisal preview and asset
-document checks. Never use sensitive parish documents for utility AI testing.
-
-Auth0 must allow `http://localhost:5174/callback` and the 5174 web/logout origin.
-The original application continues on 5173/8000. The separate demo currently
-encounters an Auth0 callback mismatch until that configuration is provided.
-
-## Checks
-
-From `backend`, using a Python environment with requirements and pytest:
-
-```powershell
-$env:DATABASE_URL='sqlite://'
-python -m pytest tests -q
-python -m unittest discover -s tests -v
-```
-
-PostgreSQL concurrency tests skip unless `TEST_POSTGRES_URL` is supplied. They
-reject any host/port other than localhost:55432 and create unique test schemas.
-During verification a separate ephemeral PostgreSQL 16 container was used; the
-real parish container and volume were never reset.
-
-From `frontend`: `npm ci`, `npm run build`, `npm run lint`, `npm audit`.
-Tests use synthetic PDFs, mocked OpenAI transport, in-memory databases and temp
-storage. No invitation emails or live AI requests are sent by the suites.
-
-## Remaining limits
-
-Asset files still use temporary local disk, and catalog entries are sample
-names, not real manufacturer downloads. Production needs private object storage,
-backups, quotas, malware scanning and real catalog sources. Upload magic/extension
-checks and a 25 MB limit do not constitute malware validation. Heuristic life,
-cost and inflation assumptions are rough suggestions, not sourced appraisals.
-
-Live Editor/Viewer sessions, SMTP, OpenAI extraction, OCR accuracy and the full
-signed-in unified browser demo remain unverified until configuration/accounts
-are available. Existing backend deprecation warnings and the frontend large
-bundle warning remain visible; lint rules were not disabled.
-
-## Draft PR order
-
-The role-hardening PR targets `role-selection` for review within that history.
-Do not merge it directly into main using unrelated histories. Its foundation is
-already ported into this integration branch.
-
-The unified draft targets `work-order-lifecycle`, excluding PR #1's own changes
-from its review diff. Review PR #1 first; after it is approved and merged into
-`work-orders`, retarget the unified draft to `work-orders` and recheck the diff.
-Promotion of work-orders to main is a separate approved team merge. No shared
-branch or PR has been merged by this work.
+Eric's local document storage and sample manual-name catalog are preserved and
+labelled temporary. Deployment needs durable private storage, backup policy and
+a real manual source. Upload validation is bounded to 25 MB and checks file
+signatures; it does not replace malware scanning. Financial heuristics remain
+suggestions. Live Auth0/browser role accounts, OpenAI extraction, SMTP and OCR
+accuracy require user configuration and acceptance testing. This integration is
+not a claim of completed production acceptance.

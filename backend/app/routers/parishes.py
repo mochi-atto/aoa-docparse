@@ -42,7 +42,11 @@ def create_parish(data: ParishCreate, db: Session = Depends(get_db), account=Dep
         address=data.address,
     )
     db.add(parish)
-    db.flush()  # Get the parish ID before adding buildings
+    try:
+        db.flush()  # Get the parish ID before adding buildings
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A parish with this name already exists")
     from app.models.parish_member import ParishMember
     db.add(ParishMember(
         parish_id=parish.id,
@@ -63,7 +67,9 @@ def create_parish(data: ParishCreate, db: Session = Depends(get_db), account=Dep
         db.rollback()
         raise HTTPException(status_code=409, detail="A parish with this name already exists")
     db.refresh(parish)
-    return parish
+    response = ParishResponse.model_validate(parish)
+    response.role = "admin"
+    return response
 
 
 @router.get("/{parish_id}", response_model=ParishResponse)
@@ -71,7 +77,9 @@ def get_parish(parish_id: int, db: Session = Depends(get_db), membership=Depends
     parish = db.query(Parish).filter(Parish.id == parish_id).first()
     if not parish:
         raise HTTPException(status_code=404, detail="Parish not found")
-    return parish
+    response = ParishResponse.model_validate(parish)
+    response.role = membership.role
+    return response
 
 
 @router.put("/{parish_id}", response_model=ParishResponse)

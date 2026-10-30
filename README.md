@@ -1,8 +1,9 @@
 # AoA Parish Management System
 
 For the unified RBAC, Work Orders and Assets integration, see
-[the review and isolated demo guide](INTEGRATION_REVIEW.md) and
-[verification results](LOCAL_VERIFICATION.md).
+[the integration report and feature matrix](UNIFIED_INTEGRATION.md),
+[local setup and rollout](INTEGRATION_REVIEW.md), and
+[executed verification results](LOCAL_VERIFICATION.md).
 
 A web application for church parishes to upload, parse, and manage utility bills and insurance appraisals. Built with React + FastAPI + PostgreSQL. Currently under development.
 
@@ -27,7 +28,7 @@ This system helps diocesan property managers track utility costs and building va
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18, TypeScript, Tailwind CSS, Recharts, PDF.js |
+| Frontend | React 19, TypeScript, Vite 8, Tailwind CSS 4, Recharts, PDF.js |
 | Backend | Python 3.11, FastAPI, SQLAlchemy, Pydantic |
 | Database | PostgreSQL 16 (Docker) |
 | Auth | Auth0 |
@@ -83,7 +84,7 @@ parish-document-parser/
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22.18+ (Node 22 is used in CI)
 - Python 3.11+
 - Docker (for PostgreSQL)
 - Auth0 account (free tier works)
@@ -96,7 +97,8 @@ cd docker
 docker compose up -d
 ```
 
-This starts PostgreSQL on port 5432. Default config uses trust auth for local development.
+First create `docker/.env` from `docker/.env.example` with your own local
+credentials. PostgreSQL binds to localhost:5432 and requires that password.
 
 Local verification must preserve the existing database. Use `docker compose stop`
 to stop PostgreSQL while keeping its data; do not remove the data volume.
@@ -143,8 +145,10 @@ Create a `.env` file in `frontend/`:
 VITE_AUTH0_DOMAIN=your-tenant.auth0.com
 VITE_AUTH0_CLIENT_ID=your-client-id
 VITE_AUTH0_AUDIENCE=your-api-identifier
-VITE_API_BASE_URL=http://localhost:8000/api
 ```
+
+The API client uses `/api`; Vite proxies to `http://localhost:8000`.
+Set `AOA_API_TARGET` when launching Vite to use a different backend.
 
 Run the dev server:
 

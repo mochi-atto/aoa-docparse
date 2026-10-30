@@ -1,91 +1,77 @@
-# Unified integration verification
+# Unified integration verification on Apple Silicon
 
-## Current status
+Executed on this Mac from integration/unified-aoa-app after merging current main
+fceb4b2 with the unified/work-order histories. Earlier Windows results are
+historical references and are superseded by this run.
 
-- **RUNNING:** isolated synthetic demo at http://localhost:5174 and API at
-  http://localhost:8001; original application remains on 5173/8000 and parish_db.
-- **PASSING:** unified pytest suite **52 passed**, including four real PostgreSQL
-  concurrency tests; unittest discovery also runs the unittest-based subset.
-  Unified TypeScript/Vite build passes, ESLint **0 errors / 0 warnings**, and
-  npm audit **0 vulnerabilities**. Large-bundle warning and 9 backend dependency
-  deprecation warnings remain.
-- **BLOCKED:** signed-in unified browser inspection: Auth0 rejects the 5174
-  callback URL. Login page and redirect were visually checked; user configuration
-  and sign-in were requested. No authentication bypass was introduced.
-- **NOT TESTED:** real Editor/Viewer browser accounts, live SMTP/OpenAI, OCR
-  accuracy, complete browser PDF workflows. Backend tests use synthetic identities
-  and PDF data and mock the AI transport. No emails or live AI requests were sent.
+## Environment
 
-## What changed
+- macOS arm64; Node 26.13.0/npm 11.20.0; Homebrew Python 3.11.18 in backend/venv.
+- Docker Desktop; native arm64 PostgreSQL 16 image.
+- Pinned backend requirements installed; pip check: no broken requirements.
+- Frontend installed from package-lock.json; npm audit: 0 vulnerabilities.
+- No real Auth0/OpenAI/SMTP credentials supplied or committed.
 
-Full Account/ParishMember RBAC and invitation foundation was ported from the
-unrelated role branch while preserving main's split dashboard and profile API.
-Invitations expire, new secrets are hashed, verified identity/email ownership is
-enforced, sign-in races are handled, and token-bearing access logs are redacted.
-Member changes are audited; the final administrator remains protected by locks.
+## Executed checks
 
-The existing Work Orders PR's claim/start/hold/resume implementation is retained
-as an ancestor, secured with membership and assignee checks, and extended with
-submit/completion notes and Admin review/close. Related building/task ownership,
-numbering races, claim races, and actor/profile names are covered.
-
-Eric's Asset history/implementation is preserved. Parish access now gates CRUD,
-catalog and document endpoints. Upload types/signatures, filenames, count/size
-limits and private downloads are validated. Accrual/remaining-life edge cases,
-null/whitespace validation and batched document loading are improved. Temporary
-disk storage, placeholder catalog and heuristic assumptions remain documented.
-
-Templates and template defaults are parish-scoped. Main's utility normalization,
-current-charge prompt and service-type deduplication fixes are preserved.
-Nested appraisal dates serialize recursively; parser transport compatibility is
-verified with the declared OpenAI 1.55.3 and HTTPX 0.28.1 and mocked responses.
-
-## Actual checks
-
-Commands used the existing `aoa-dev` Python 3.11 environment. Pytest and OpenAI
-1.55.3 were installed into the ignored local `.integration/test-deps` directory,
-without changing the original environment. The original environment's older SDK
-compatibility was also tested earlier. Frontend dependencies were installed only
-in the isolated worktrees.
-
-| Check | Result |
+| Command/check | Actual result |
 | --- | --- |
-| `python -m pytest tests -q --disable-warnings` | 52 passed, 9 warnings, 4.90s |
-| `python -m unittest discover -s tests -q` | 42 passed, 3.453s; excludes Eric's 10 pytest function tests |
-| Role-hardening branch `python -m unittest discover -s tests -q` | 26 passed, 1.112s |
-| `npm run build` in unified | TypeScript + Vite pass, 676 modules |
-| `npm run lint -- --format json --output-file ../lint-results.json` | Exit 0; 0 errors / 0 warnings |
-| `npm audit` | 0 vulnerabilities after patched dependency updates |
-| Role-hardening frontend build + touched-file ESLint | Pass |
-| Role-hardening full ESLint | 118 remaining errors in its legacy monolithic dashboard/appraisal code; no rule disables |
-| Migration plan/apply/idempotency tests | Pass on isolated SQLite; real PostgreSQL fresh schemas created successfully |
-| PostgreSQL last-admin demotion race | Exactly one demotion succeeds; an administrator remains |
-| PostgreSQL double claim / numbering / first sign-in | One claim winner; distinct numbers; one identity row |
-| Original and isolated API health / proxy | HTTP 200 |
-| `git diff --check` | Pass |
+| DATABASE_URL=sqlite:// TEST_POSTGRES_URL=<disposable localhost:55432 URL> venv/bin/python -m pytest tests -q | 62 passed, 0 failed, 0 skipped; 9 deprecation warnings |
+| Same environment, venv/bin/python -m unittest discover -s tests -q | 52 passed, 0 failed, 0 skipped (unittest subset, not additional independent coverage) |
+| npm test | 2 passed, 0 failed |
+| npm run typecheck | Pass |
+| npm run lint | Pass, no errors/warnings |
+| npm run build | Pass; Vite bundle-size and Node deprecation warnings remain |
+| npm audit --audit-level=low | 0 vulnerabilities |
+| Python pip check | No broken requirements |
+| Frontend localhost:5174 | HTTP 200 |
+| API health and readiness through frontend proxy | HTTP 200, healthy/ready |
+| API localhost:8001/openapi.json | HTTP 200 |
+| Unauthenticated parish API | HTTP 403 |
+| CORS preflight for localhost:5174 | HTTP 200, exact allowed origin |
+| Migration plan/apply on new aoa_unified_validation | 13 tables created; no existing database changed |
+| git diff --check | Pass |
 
-The PostgreSQL checks used a separate ephemeral `aoa-integration-verification`
-container bound only to 127.0.0.1:55432 and unique synthetic test schemas. The
-existing PostgreSQL volume was never reset. Additive migration was applied only
-to the isolated SQLite demo; no integration migration touched parish_db.
+The suite includes four concurrent PostgreSQL race tests, a PostgreSQL legacy
+migration regression, and a complete PostgreSQL application test using real
+synthetic RSA-signed JWTs. The latter mocks JWKS discovery only: real token
+validation, account bootstrap, invitations/verified identities, Editor/Viewer
+restrictions, appraisal create/edit/delete, generated PDF parsing, asset CRUD,
+private document upload/download/delete and claim/start/hold/resume/submit/Admin
+close all execute against unique synthetic schemas. SQLite regressions cover
+cross-parish isolation, last-admin protection, parser transport and nested dates,
+file signatures/size/path validation, invitation expiry/replay and role changes.
+Frontend tests cover token renewal, removal of stale defaults and failed renewal.
 
-## Review and demo
+Commands from the repository root (each server runs in its own terminal):
 
-See [INTEGRATION_REVIEW.md](INTEGRATION_REVIEW.md) for permission policy, attribution,
-dependency/merge order, migration limitations, and exact PowerShell-friendly
-Python demo launcher commands. The original working directory still contains
-the user's uncommitted local fixes. New commits and pushes belong only to the
-new review branches. No shared branch or PR was merged or force-pushed.
+```bash
+cd backend
+DATABASE_URL=sqlite:// TEST_POSTGRES_URL='<disposable localhost:55432 URL>' venv/bin/python -m pytest tests -q
+DATABASE_URL=sqlite:// TEST_POSTGRES_URL='<disposable localhost:55432 URL>' venv/bin/python -m unittest discover -s tests -q
+```
 
+```bash
+cd frontend
+npm test
+npm run typecheck
+npm run lint
+npm run build
+npm audit
+```
 
-## Draft pull requests
+Tests refuse PostgreSQL hosts/ports outside localhost:55432, create unique schemas,
+and use synthetic documents/identities. No invitation email or live AI request is
+sent. The test container stores its PostgreSQL cluster in tmpfs; do not point the
+running validation API at a shared database. Existing development parish_db and
+its volume were not migrated, reset or populated by this integration.
 
-- [PR #2: role hardening](https://github.com/mochi-atto/aoa-docparse/pull/2):
-  `codex/role-management-hardening` ? `role-selection`.
-- [PR #3: unified integration](https://github.com/mochi-atto/aoa-docparse/pull/3):
-  `codex/unified-parish-management` ? `work-order-lifecycle`.
+## Not verified
 
-Both are drafts. Existing PR #1 is unchanged. Review #1 first; after it merges
-into work-orders, retarget #3 to work-orders and recheck the diff. Promotion to
-main needs separate approval. #2 reviews the unrelated role history; its
-foundation is already ported into #3, so do not force unrelated histories.
+Live Auth0 sign-in/callback and signed-in browser UI (including real Editor/Viewer
+accounts), real OpenAI extraction, SMTP delivery, OCR accuracy and full browser
+PDF workflows. The HTTP frontend check verifies serving/proxy behavior, not a
+visual browser test. Credentials and Auth0 callback/origin registration are still
+needed. Existing temporary asset disk storage/sample manual names are preserved;
+production acceptance and durable storage remain pending. CI results are reported
+on the integration PR and are separate from these local results.

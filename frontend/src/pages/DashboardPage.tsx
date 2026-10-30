@@ -110,11 +110,11 @@ export default function DashboardPage() {
         api.get(`/parishes/${parishId}`),
         api.get(`/data/utility/${parishId}`),
         api.get(`/data/appraisal/${parishId}`),
-        api.get(`/templates/`, { params: { parish_id: parishId } }).catch(() => ({ data: [] })),
+        api.get(`/templates/`, { params: { parish_id: parishId } }),
         api.get(`/parishes/${parishId}/todos`),
         api.get(`/parishes/${parishId}/history`),
-        api.get(`/parishes/${parishId}/work-orders`).catch(() => ({ data: [] })),
-        api.get(`/users/me`).catch(() => ({ data: null })),
+        api.get(`/parishes/${parishId}/work-orders`),
+        api.get(`/users/me`),
       ]);
       setWorkOrders(woRes.data);
       setProfile(profileRes.data);
