@@ -1,18 +1,19 @@
+import type { DashboardViewProps } from "./viewTypes";
 import { PRIORITY } from "./constants";
 
-export function AddTaskForm({ newTaskText, setNewTaskText, newTaskBuilding, setNewTaskBuilding, newTaskPriority, setNewTaskPriority, addTask, onCancel, buildings }: any) {
+export function AddTaskForm({ newTaskText, setNewTaskText, newTaskBuilding, setNewTaskBuilding, newTaskPriority, setNewTaskPriority, addTask, onCancel, buildings }: Pick<DashboardViewProps, "newTaskText" | "setNewTaskText" | "newTaskBuilding" | "setNewTaskBuilding" | "newTaskPriority" | "setNewTaskPriority" | "addTask" | "onCancel" | "buildings">) {
   return (
     <div className="bg-white rounded-xl border border-stone-200 p-4 mb-3">
       <div className="grid grid-cols-2 gap-3 mb-3">
-        <input value={newTaskText} onChange={(e: any) => setNewTaskText(e.target.value)} placeholder="Task description" className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300" />
+        <input value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="Task description" className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300" />
         {buildings && buildings.length > 0 ? (
-          <select value={newTaskBuilding} onChange={(e: any) => setNewTaskBuilding(e.target.value)}
+          <select value={newTaskBuilding} onChange={(e) => setNewTaskBuilding(e.target.value)}
             className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300 bg-white">
             <option value="">Select building</option>
-            {buildings.map((b: any) => <option key={b.id} value={b.name}>{b.name}</option>)}
+            {buildings.map((b) => <option key={b.id} value={b.name}>{b.name}</option>)}
           </select>
         ) : (
-          <input value={newTaskBuilding} onChange={(e: any) => setNewTaskBuilding(e.target.value)} placeholder="Building name" className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300" />
+          <input value={newTaskBuilding} onChange={(e) => setNewTaskBuilding(e.target.value)} placeholder="Building name" className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300" />
         )}
       </div>
       <div className="flex items-center gap-2 mb-3">

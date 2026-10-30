@@ -12,11 +12,12 @@
   "dependencies": {
     "@auth0/auth0-react": "^2.15.0",
     "axios": "^1.13.6",
-    "pdfjs-dist": "^5.6.205",
+    "pdfjs-dist": "^6.4.299",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-router-dom": "^6.30.3",
-    "recharts": "^3.7.0"
+    "react-router-dom": "^7.18.5",
+    "recharts": "^3.7.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

@@ -1,9 +1,11 @@
+import { errorDetail } from "../services/errors";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { setAuthToken } from "../services/api";
 
 interface Parish {
+  role?: "admin" | "editor" | "viewer";
   id: number;
   name: string;
   diocese: string | null;
@@ -21,11 +23,15 @@ export default function ParishSelectPage() {
 
   // Create form
   const [newName, setNewName] = useState("");
-  const [newDiocese, setNewDiocese] = useState("");
-  const [newAddress, setNewAddress] = useState("");
   const [newBuildings, setNewBuildings] = useState<string[]>([""]); // Start with one empty input
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+
+  // Delete modal
+  const [deleteTarget, setDeleteTarget] = useState<Parish | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -56,14 +62,41 @@ export default function ParishSelectPage() {
       });
       setParishes((prev) => [...prev, res.data]);
       setNewName(""); setNewBuildings([""]); setShowCreate(false);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || "Failed to create parish");
+    } catch (err) {
+      setError(errorDetail(err) || "Failed to create parish");
     } finally { setCreating(false); }
   };
 
   const addBuildingInput = () => setNewBuildings((prev) => [...prev, ""]);
   const updateBuildingInput = (idx: number, val: string) => setNewBuildings((prev) => prev.map((b, i) => i === idx ? val : b));
   const removeBuildingInput = (idx: number) => setNewBuildings((prev) => prev.filter((_, i) => i !== idx));
+
+  const openDeleteModal = (p: Parish, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteTarget(p);
+    setDeleteConfirmText("");
+    setDeleteError("");
+  };
+
+  const closeDeleteModal = () => {
+    setDeleteTarget(null);
+    setDeleteConfirmText("");
+    setDeleteError("");
+  };
+
+  const deleteParish = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true); setDeleteError("");
+    try {
+      const token = await getAccessTokenSilently();
+      setAuthToken(token);
+      await api.delete(`/parishes/${deleteTarget.id}`);
+      setParishes((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+      closeDeleteModal();
+    } catch (err) {
+      setDeleteError(errorDetail(err) || "Failed to delete parish");
+    } finally { setDeleting(false); }
+  };
 
   return (
     <>
@@ -87,21 +120,31 @@ export default function ParishSelectPage() {
           ) : (
             <div className="space-y-2 mb-6">
               {parishes.map((p) => (
-                <button key={p.id} onClick={() => navigate(`/dashboard/${p.id}`)}
-                  className="w-full text-left bg-white rounded-xl border border-stone-200 p-4 hover:border-stone-400 hover:shadow-sm transition-all group">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="font-semibold text-stone-800" style={{ fontFamily: "'Fraunces', serif" }}>{p.name}</span>
-                      {p.diocese && <span className="text-sm text-stone-400 ml-2">· {p.diocese}</span>}
+                <div key={p.id} className="relative group">
+                  <button onClick={() => navigate(`/dashboard/${p.id}`)}
+                    className="w-full text-left bg-white rounded-xl border border-stone-200 p-4 hover:border-stone-400 hover:shadow-sm transition-all group">
+                    <div className="flex items-center justify-between pr-8">
+                      <div>
+                        <span className="font-semibold text-stone-800" style={{ fontFamily: "'Fraunces', serif" }}>{p.name}</span>
+                        <span className="ml-2 text-xs text-stone-500 capitalize">{p.role}</span>
+                        {p.diocese && <span className="text-sm text-stone-400 ml-2">· {p.diocese}</span>}
+                      </div>
+                      <span className="text-stone-300 group-hover:text-stone-500 transition-colors">→</span>
                     </div>
-                    <span className="text-stone-300 group-hover:text-stone-500 transition-colors">→</span>
-                  </div>
-                  {p.buildings && p.buildings.length > 0 && (
-                    <div className="flex gap-1.5 mt-2">{p.buildings.map((b) => (
-                      <span key={b.id} className="text-xs bg-stone-100 text-stone-500 px-2 py-0.5 rounded-full">{b.name}</span>
-                    ))}</div>
-                  )}
-                </button>
+                    {p.buildings && p.buildings.length > 0 && (
+                      <div className="flex gap-1.5 mt-2">{p.buildings.map((b) => (
+                        <span key={b.id} className="text-xs bg-stone-100 text-stone-500 px-2 py-0.5 rounded-full">{b.name}</span>
+                      ))}</div>
+                    )}
+                  </button>
+                  <button hidden={p.role !== "admin"}
+                    onClick={(e) => openDeleteModal(p, e)}
+                    className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity text-stone-300 hover:text-red-500 p-1 rounded"
+                    title="Delete parish"
+                  >
+                    ✕
+                  </button>
+                </div>
               ))}
               {parishes.length === 0 && (
                 <div className="text-center py-12 bg-white rounded-xl border border-stone-200">
@@ -113,7 +156,7 @@ export default function ParishSelectPage() {
           )}
 
           {/* Create button / form */}
-          {!showCreate ? (
+          {(parishes.length === 0 || parishes.some(p => p.role === "admin")) && (!showCreate ? (
             <button onClick={() => setShowCreate(true)}
               className="w-full bg-stone-800 hover:bg-stone-900 text-white py-3 rounded-xl text-sm font-medium transition-colors">
               + Create New Parish
@@ -162,9 +205,44 @@ export default function ParishSelectPage() {
                 </div>
               </div>
             </div>
-          )}
+          ))}
         </div>
       </div>
+
+    {/* Delete confirmation modal */}
+    {deleteTarget && (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={closeDeleteModal}>
+        <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          <h2 className="text-lg font-semibold text-stone-800 mb-1" style={{ fontFamily: "'Fraunces', serif" }}>Delete Parish</h2>
+          <p className="text-sm text-stone-500 mb-4">
+            This will permanently delete <span className="font-medium text-stone-700">{deleteTarget.name}</span> and all of its data. This action cannot be undone.
+          </p>
+          <p className="text-xs font-medium text-stone-500 mb-2">
+            Type <span className="font-mono bg-stone-100 px-1 py-0.5 rounded text-stone-700">{deleteTarget.name}</span> to confirm
+          </p>
+          <input
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            placeholder={deleteTarget.name}
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 mb-3"
+            autoFocus
+          />
+          {deleteError && <p className="text-sm text-red-600 mb-3">{deleteError}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={deleteParish}
+              disabled={deleting || deleteConfirmText !== deleteTarget.name}
+              className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-stone-200 disabled:text-stone-400 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+            >
+              {deleting ? "Deleting…" : "Delete Parish"}
+            </button>
+            <button onClick={closeDeleteModal} className="px-4 py-2.5 text-sm text-stone-500 hover:text-stone-700 transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }

@@ -1,5 +1,9 @@
 # AoA Parish Management System
 
+For the unified RBAC, Work Orders and Assets integration, see
+[the review and isolated demo guide](INTEGRATION_REVIEW.md) and
+[verification results](LOCAL_VERIFICATION.md).
+
 A web application for church parishes to upload, parse, and manage utility bills and insurance appraisals. Built with React + FastAPI + PostgreSQL. Currently under development.
 
 ## Overview
@@ -10,6 +14,7 @@ This system helps diocesan property managers track utility costs and building va
 
 - **Utility Bill Parsing** — Upload PDF utility bills. An LLM (OpenAI) extracts provider, amount, date, account number, and utility type automatically.
 - **Appraisal Entry** — Upload appraisal PDFs and enter data via a side-by-side guided form. PDF renders in-browser; values are copy-pasted with automatic cleaning (strips `$`, commas, labels). Fully local — no data sent to AI.
+- **Asset Tracking** — Per-parish asset register (location, manufacturer, install year, expected life, initial cost) with derived remaining life, editable annual accrual, a 10-year accrual plan, and a per-asset document holder. Suggested life/cost and the "worth tracking?" check are rule-of-thumb helpers. **Document storage and manual lookup are temporary** (see below).
 - **Dashboard** — Single-page overview with tabs for utility trends, building valuations, active risks/tasks, finances, and history.
 - **Building Management** — First-class building entities with per-building utility account tracking, valuation history, and task assignment.
 - **General Expenses** — Virtual category for non-building-specific utility bills (e.g., shared internet, parish-wide water).
@@ -57,6 +62,7 @@ parish-document-parser/
 │   │   ├── routers/
 │   │   │   ├── parishes.py              # Parish + building CRUD
 │   │   │   ├── upload.py                # File upload + LLM parsing
+│   │   │   ├── assets.py                # Asset CRUD + documents + manual lookup
 │   │   │   ├── data.py                  # Utility/appraisal data + edit/delete
 │   │   │   └── parish_data.py           # Todos + history
 │   │   ├── schemas/
@@ -92,12 +98,8 @@ docker compose up -d
 
 This starts PostgreSQL on port 5432. Default config uses trust auth for local development.
 
-If you need to reset the database (drops all data):
-
-```bash
-docker compose down -v
-docker compose up -d
-```
+Local verification must preserve the existing database. Use `docker compose stop`
+to stop PostgreSQL while keeping its data; do not remove the data volume.
 
 ### 2. Backend
 
@@ -123,7 +125,10 @@ Run the server:
 uvicorn app.main:app --reload --port 8000
 ```
 
-Tables are created automatically on first start via `Base.metadata.create_all()`.
+Schema creation and upgrades are explicit. Review `python -m app.migrations`,
+then apply only to an approved target with `python -m app.migrations --apply`.
+App import never alters PostgreSQL tables or removes constraints. Review legacy
+ownership mappings first; use the isolated demo guide for safe local verification.
 
 ### 3. Frontend
 
@@ -238,3 +243,31 @@ The system normalizes utility types from LLM output:
 - `DELETE /api/parishes/{id}/todos/{tid}` — Delete task
 - `GET /api/parishes/{id}/history` — List history entries
 - `POST /api/data/history/{eid}/mark-removed` — Mark history entry as removed
+
+### Assets
+- `GET /api/parishes/{id}/assets` — List assets (includes derived `remaining_life` and `annual_accrual`)
+- `POST /api/parishes/{id}/assets` — Create asset (optional `catalog_manuals` names to attach)
+- `PUT /api/parishes/{id}/assets/{aid}` — Update asset; send `accrual_override: null` to reset to cost ÷ life
+- `DELETE /api/parishes/{id}/assets/{aid}` — Delete asset and its files
+- `POST /api/parishes/{id}/assets/{aid}/documents` — Upload documents (multipart `files`)
+- `GET /api/parishes/{id}/assets/{aid}/documents/{did}/file` — Download an uploaded document
+- `DELETE /api/parishes/{id}/assets/{aid}/documents/{did}` — Remove a document
+- `GET /api/parishes/{id}/assets/manual-lookup?asset_type=&manufacturer=` — **Temporary** sample-catalog lookup
+
+### Temporary pieces (replace before production)
+
+| Piece | Where | What it does now | Needs |
+|-------|-------|------------------|-------|
+| Asset document storage | `backend/app/services/temp_asset_storage.py` | Saves uploads to local disk (`ASSET_UPLOAD_DIR`, default `backend/uploads/assets`, git-ignored) | Object storage (S3/GCS); local disk is lost on redeploy |
+| Manual lookup | `backend/app/services/temp_manual_lookup.py` | Hard-coded list of manual *names* by manufacturer/type; attaching one records only the name | A real manual source |
+
+The UI marks both with amber "Temporary" badges.
+
+### Tests
+
+```bash
+cd backend
+python -m pytest tests/test_assets_api.py
+```
+
+Uses in-memory SQLite and a temp upload directory; no Postgres or Auth0 needed.

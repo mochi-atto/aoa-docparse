@@ -5,14 +5,22 @@ from typing import Optional, List
 import datetime
 
 from app.database import get_db
+from app.auth import parish_access, parish_editor_access, parish_admin_access
+from app.models.parish import Parish
 from app.models.work_order import WorkOrder
 from app.models.building import Building
 from app.models.todo import Todo
 from app.models.user_profile import UserProfile
 from app.models.history_entry import HistoryEntry
-from app.permissions import CurrentUser, get_current_user, require
+from app.permissions import CurrentUser, get_current_user
 
 router = APIRouter()
+
+def display_name(db, user, membership):
+    profile = db.query(UserProfile).filter(UserProfile.sub == user.sub).first()
+    return (profile.display_name if profile else None) or user.name or membership.account.email
+
+
 
 PRIORITIES = ["low", "medium", "high", "urgent"]
 
@@ -67,12 +75,14 @@ def apply_transition(order: WorkOrder, action: str) -> str:
     elif (action == "resume"):
         order.status_before_hold = None
 
+    if action == "resume" and target not in {"assigned", "in_progress"}:
+        raise HTTPException(status_code=409, detail="Work order has no valid status to resume")
     order.status = target
     return target
 
 def get_work_order(db: Session, parish_id: int, order_id: int) -> WorkOrder:
     work_order = (
-        db.query(WorkOrder).filter(WorkOrder.id == order_id, WorkOrder.parish_id == parish_id).first()
+        db.query(WorkOrder).filter(WorkOrder.id == order_id, WorkOrder.parish_id == parish_id).with_for_update().populate_existing().first()
     )
 
     if work_order is None:
@@ -125,8 +135,8 @@ def list_work_orders(
     parish_id: int,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
+    membership=Depends(parish_access),
 ):
-    # anyone logged in can view; no require() call here
     return (
         db.query(WorkOrder)
         .filter(WorkOrder.parish_id == parish_id)
@@ -141,8 +151,9 @@ def create_work_order(
     data: WorkOrderCreate,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
+    membership=Depends(parish_editor_access),
 ):
-    require(user, "work_orders.create")
+    db.query(Parish).filter(Parish.id == parish_id).with_for_update().one()
 
     title = data.title.strip()
     if not title:
@@ -175,17 +186,11 @@ def create_work_order(
         days = DEFAULT_DUE_DAYS[data.priority]
         due_date = datetime.date.today() + datetime.timedelta(days=days)
 
-    existing_count = db.query(WorkOrder).filter(WorkOrder.parish_id == parish_id).count()
+    numbers = db.query(WorkOrder.display_number).filter(WorkOrder.parish_id == parish_id).all()
+    existing_count = max((int(n[0][3:]) for n in numbers if n[0].startswith("WO-") and n[0][3:].isdigit()), default=0)
     display_number = f"WO-{existing_count + 1:04d}" # WO-0001, WO-0002, etc.
 
-    # Prefer the user's saved display name, then the token's name, then what the client sent
-    profile = db.query(UserProfile).filter(UserProfile.sub == user.sub).first()
-    if profile and profile.display_name:
-        requester_name = profile.display_name
-    elif user.name:
-        requester_name = user.name
-    else:
-        requester_name = data.requester_name
+    requester_name = display_name(db, user, membership)
 
     order = WorkOrder(
         parish_id=parish_id,
@@ -207,6 +212,7 @@ def create_work_order(
         parish_id=parish_id,
         entry_type="work_order_created",
         description=f"Work order {display_number} created: {title}",
+        snapshot={"actor_sub": user.sub, "actor_name": display_name(db, user, membership)},
         related_type="work_order",
         related_id=order.id,
     ))
@@ -222,19 +228,20 @@ def claim_work_order(
     order_id: int,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
+    membership=Depends(parish_editor_access),
 ):
 
-    require(user, "work_orders.claim")
     work_order = get_work_order(db, parish_id, order_id)
 
     apply_transition(work_order, "claim")
     work_order.technician_sub = user.sub
-    work_order.technician_name = user.name
+    work_order.technician_name = display_name(db, user, membership)
 
     db.add(HistoryEntry(
         parish_id=parish_id,
         entry_type="work_order_claimed",
-        description=f"Work order {work_order.display_number} claimed by: {user.name}",
+        description=f"Work order {work_order.display_number} claimed by: {display_name(db, user, membership)}",
+        snapshot={"actor_sub": user.sub, "actor_name": display_name(db, user, membership)},
         related_type="work_order",
         related_id=work_order.id,
     ))
@@ -250,18 +257,20 @@ def start_work_order(
     order_id: int,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
+    membership=Depends(parish_editor_access),
 ):
 
-    require(user, "work_orders.start")
     work_order = get_work_order(db, parish_id, order_id)
 
+    authorize_assignee(work_order, membership, user.sub)
     apply_transition(work_order, "start")
     work_order.started_at = datetime.datetime.utcnow()
 
     db.add(HistoryEntry(
         parish_id=parish_id,
         entry_type="work_order_started",
-        description=f"Work order {work_order.display_number} started by: {user.name}",
+        description=f"Work order {work_order.display_number} started by: {display_name(db, user, membership)}",
+        snapshot={"actor_sub": user.sub, "actor_name": display_name(db, user, membership)},
         related_type="work_order",
         related_id=work_order.id,
     ))
@@ -277,17 +286,19 @@ def hold_work_order(
     order_id: int,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
+    membership=Depends(parish_editor_access),
 ):
 
-    require(user, "work_orders.hold")
     work_order = get_work_order(db, parish_id, order_id)
 
+    authorize_assignee(work_order, membership, user.sub)
     apply_transition(work_order, "hold")
 
     db.add(HistoryEntry(
         parish_id=parish_id,
         entry_type="work_order_on_hold",
-        description=f"Work order {work_order.display_number} put on hold by: {user.name}",
+        description=f"Work order {work_order.display_number} put on hold by: {display_name(db, user, membership)}",
+        snapshot={"actor_sub": user.sub, "actor_name": display_name(db, user, membership)},
         related_type="work_order",
         related_id=work_order.id,
     ))
@@ -303,17 +314,19 @@ def resume_work_order(
     order_id: int,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
+    membership=Depends(parish_editor_access),
 ):
 
-    require(user, "work_orders.resume")
     work_order = get_work_order(db, parish_id, order_id)
 
+    authorize_assignee(work_order, membership, user.sub)
     apply_transition(work_order, "resume")
 
     db.add(HistoryEntry(
         parish_id=parish_id,
         entry_type="work_order_resumed",
-        description=f"Work order {work_order.display_number} resumed by: {user.name}",
+        description=f"Work order {work_order.display_number} resumed by: {display_name(db, user, membership)}",
+        snapshot={"actor_sub": user.sub, "actor_name": display_name(db, user, membership)},
         related_type="work_order",
         related_id=work_order.id,
     ))
@@ -321,3 +334,41 @@ def resume_work_order(
     db.commit()
     db.refresh(work_order)
     return work_order
+
+def authorize_assignee(order, membership, subject):
+    if membership.role != "admin" and order.technician_sub != subject:
+        raise HTTPException(status_code=403, detail="Only the assigned technician or parish administrator can change this order")
+
+class SubmitRequest(BaseModel):
+    completion_notes: str
+
+@router.post("/{parish_id}/work-orders/{order_id}/submit", response_model=WorkOrderResponse)
+def submit_work_order(parish_id: int, order_id: int, data: SubmitRequest,
+                      membership=Depends(parish_editor_access), db: Session = Depends(get_db)):
+    order = get_work_order(db, parish_id, order_id)
+    authorize_assignee(order, membership, membership.account.auth0_sub)
+    if not data.completion_notes.strip():
+        raise HTTPException(status_code=422, detail="Completion notes are required")
+    apply_transition(order, "submit")
+    order.completion_notes = data.completion_notes.strip()
+    db.add(HistoryEntry(parish_id=parish_id, entry_type="work_order_submitted",
+        description=f"Work order {order.display_number} submitted for review",
+        snapshot={"actor_sub": membership.account.auth0_sub},
+        related_type="work_order", related_id=order.id))
+    db.commit()
+    db.refresh(order)
+    return order
+
+@router.post("/{parish_id}/work-orders/{order_id}/close", response_model=WorkOrderResponse)
+def close_work_order(parish_id: int, order_id: int,
+                     membership=Depends(parish_admin_access), db: Session = Depends(get_db)):
+    order = get_work_order(db, parish_id, order_id)
+    apply_transition(order, "close")
+    order.closed_at = datetime.datetime.utcnow()
+    db.add(HistoryEntry(parish_id=parish_id, entry_type="work_order_closed",
+        description=f"Work order {order.display_number} closed after review",
+        snapshot={"actor_sub": membership.account.auth0_sub},
+        related_type="work_order", related_id=order.id))
+    db.commit()
+    db.refresh(order)
+    return order

@@ -5,3 +5,15 @@ __pycache__/
 *.pyc
 *.pyo
 
+# TEMPORARY local asset document storage
+backend/uploads/
+
+# Isolated verification artifacts and demo data
+lint-results.json
+.demo/
+*.sqlite
+*.sqlite3
+
+# Local integration worktrees and check output
+.integration/
+lint-results.json

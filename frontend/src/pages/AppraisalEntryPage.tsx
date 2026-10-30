@@ -1,5 +1,6 @@
+import { errorDetail } from "../services/errors";
 import { useAuth0 } from "@auth0/auth0-react";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import * as pdfjsLib from "pdfjs-dist";
 import api, { setAuthToken } from "../services/api";
@@ -32,7 +33,7 @@ export default function AppraisalEntryPage() {
   const location = useLocation();
   const { getAccessTokenSilently } = useAuth0();
 
-  const passedFile = (location.state as any)?.file as File | undefined;
+  const passedFile = (location.state as { file?: File } | null)?.file as File | undefined;
 
   const [pdfFile, setPdfFile] = useState<File | null>(passedFile || null);
   const [pages, setPages] = useState<PageData[]>([]);
@@ -61,7 +62,7 @@ export default function AppraisalEntryPage() {
         const res = await api.get(`/parishes/${parishId}/buildings`);
         const parishBuildings = res.data;
         if (parishBuildings.length > 0) {
-          setBuildings(parishBuildings.map((b: any) => ({
+          setBuildings(parishBuildings.map((b: { id: number; name: string }) => ({
             key: String(b.id), name: b.name, valuation_number: "", building_value: "", gross_sq_ft: "",
           })));
         } else {
@@ -83,7 +84,7 @@ export default function AppraisalEntryPage() {
         const page = await pdf.getPage(i + 1);
         const tc = await page.getTextContent();
         const items: { str: string; x: number; y: number; width: number }[] = [];
-        for (const item of tc.items) { if ("str" in item) { const t = item as any; items.push({ str: t.str, x: t.transform[4], y: Math.round(t.transform[5] * 10) / 10, width: t.width }); } }
+        for (const item of tc.items) { if ("str" in item) { const t = item; items.push({ str: t.str, x: t.transform[4], y: Math.round(t.transform[5] * 10) / 10, width: t.width }); } }
         const groups: { y: number; items: typeof items }[] = [];
         for (const item of items) { const g = groups.find((g) => Math.abs(g.y - item.y) <= 3); if (g) g.items.push(item); else groups.push({ y: item.y, items: [item] }); }
         groups.sort((a, b) => b.y - a.y);
@@ -91,7 +92,7 @@ export default function AppraisalEntryPage() {
         for (const g of groups) { g.items.sort((a, b) => a.x - b.x); let l = ""; for (let k = 0; k < g.items.length; k++) { if (k > 0) l += g.items[k].x - (g.items[k - 1].x + g.items[k - 1].width) > 10 ? "    " : " "; l += g.items[k].str; } if (l.trim()) lines.push(l.trim()); }
         const vp = page.getViewport({ scale: 1.5 });
         const canvas = document.createElement("canvas"); canvas.width = vp.width; canvas.height = vp.height;
-        await page.render({ canvas, viewport: vp } as any).promise;
+        await page.render({ canvas, viewport: vp }).promise;
         arr.push({ lines, imageSrc: canvas.toDataURL("image/jpeg", 0.8) });
       }
       setPages(arr);
@@ -133,7 +134,7 @@ export default function AppraisalEntryPage() {
       });
       setSaveMsg("Saved!");
       setTimeout(() => navigate(`/dashboard/${parishId}`), 1200);
-    } catch (err: any) { setSaveMsg(err?.response?.data?.detail || "Failed"); }
+    } catch (err) { setSaveMsg(errorDetail(err) || "Failed"); }
     finally { setSaving(false); }
   };
 
