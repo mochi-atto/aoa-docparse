@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, JSON, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, JSON, Boolean, ForeignKey
 from app.database import Base
 import datetime
 
@@ -7,6 +7,7 @@ class ExtractionTemplate(Base):
     __tablename__ = "extraction_templates"
 
     id = Column(Integer, primary_key=True, index=True)
+    parish_id = Column(Integer, ForeignKey("parishes.id"), nullable=True, index=True)
     name = Column(String, nullable=False)                  # e.g., "Broward County Insurance Appraisal"
     description = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)

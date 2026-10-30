@@ -1,13 +1,15 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 import datetime
 
 class Parish(Base):
     __tablename__ = "parishes"
+    __table_args__ = (UniqueConstraint("owner_account_id", "name", name="uq_parish_owner_name"),)
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, nullable=False)
+    name = Column(String, nullable=False)
+    owner_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True, index=True)
     diocese = Column(String, nullable=True)
     address = Column(String, nullable=True)
     image_data = Column(Text, nullable=True)  # Base64 data URL for parish photo
@@ -18,5 +20,7 @@ class Parish(Base):
     todos = relationship("Todo", back_populates="parish", cascade="all, delete-orphan")
     history_entries = relationship("HistoryEntry", back_populates="parish", cascade="all, delete-orphan")
     buildings = relationship("Building", back_populates="parish", cascade="all, delete-orphan")
+    members = relationship("ParishMember", back_populates="parish", cascade="all, delete-orphan")
+    owner = relationship("Account", back_populates="owned_parishes")
     work_orders = relationship("WorkOrder", back_populates="parish", cascade="all, delete-orphan")
     assets = relationship("Asset", back_populates="parish", cascade="all, delete-orphan")

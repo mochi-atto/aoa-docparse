@@ -1,3 +1,7 @@
+import type { WorkOrderAction } from "./dashboard/WorkOrderActions";
+import ManageMembersModal from "../components/ManageMembersModal";
+import { memberApi, type ParishRole } from "../services/api";
+import { errorDetail } from "../services/errors";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -19,12 +23,18 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { getAccessTokenSilently, user, logout } = useAuth0();
 
+  const [role, setRole] = useState<ParishRole | null>(null);
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const isAdmin = role === "admin";
+  const canEdit = isAdmin || role === "editor";
+
   // Data
   const [parish, setParish] = useState<Parish | null>(null);
   const [utilities, setUtilities] = useState<UtilityBill[]>([]);
   const [appraisals, setAppraisals] = useState<Appraisal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [templates, setTemplates] = useState<any[]>([]);
+  const [, setTemplates] = useState<{ id: number; is_default: boolean }[]>([]);
   const [buildings, setBuildings] = useState<BuildingData[]>([]);
 
   // UI
@@ -93,11 +103,14 @@ export default function DashboardPage() {
     try {
       const token = await getAccessTokenSilently();
       setAuthToken(token);
+      const member = await memberApi.me(parishId!);
+      setRole(member.data.role);
+      setLoadError("");
       const [pRes, uRes, aRes, tRes, todoRes, histRes, woRes, profileRes] = await Promise.all([
         api.get(`/parishes/${parishId}`),
         api.get(`/data/utility/${parishId}`),
         api.get(`/data/appraisal/${parishId}`),
-        api.get(`/templates/`).catch(() => ({ data: [] })),
+        api.get(`/templates/`, { params: { parish_id: parishId } }).catch(() => ({ data: [] })),
         api.get(`/parishes/${parishId}/todos`),
         api.get(`/parishes/${parishId}/history`),
         api.get(`/parishes/${parishId}/work-orders`).catch(() => ({ data: [] })),
@@ -111,15 +124,15 @@ export default function DashboardPage() {
       setUtilities(uRes.data);
       setAppraisals(aRes.data);
       setTemplates(tRes.data);
-      setTodos(todoRes.data.map((t: any) => ({
+      setTodos(todoRes.data.map((t: { id: number; text: string; building: string; priority: TodoItem["priority"]; prev_priority?: TodoItem["prevPriority"]; done: boolean; created_at: string }) => ({
         id: t.id, text: t.text, building: t.building,
         priority: t.priority, prevPriority: t.prev_priority,
         done: t.done, createdAt: t.created_at,
       })));
-      setHistory(histRes.data.map((h: any) => ({
+      setHistory(histRes.data.map((h: { id: number; entry_type: string; description: string; created_at: string; undone?: string; user_email?: string; user_name?: string }) => ({
         id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name,
       })));
-    } catch (err) { console.error("Dashboard load error:", err); }
+    } catch (err) { setRole(null); setLoadError(errorDetail(err) || "Could not load this parish"); }
     finally { setLoading(false); }
   }, [parishId, getAccessTokenSilently]);
 
@@ -141,7 +154,7 @@ export default function DashboardPage() {
       const token = await getAccessTokenSilently();
       setAuthToken(token);
       const res = await api.get(`/parishes/${parishId}/history`);
-      setHistory(res.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
+      setHistory(res.data.map((h: { id: number; entry_type: string; description: string; created_at: string; undone?: string; user_email?: string; user_name?: string }) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
     } catch { /* silent */ }
   }, [parishId, getAccessTokenSilently]);
 
@@ -156,7 +169,7 @@ export default function DashboardPage() {
       const t = res.data;
       setTodos((prev) => prev.map((x) => x.id === id ? { id: t.id, text: t.text, building: t.building, priority: t.priority, prevPriority: t.prev_priority, done: t.done, createdAt: t.created_at } : x));
       const hRes = await api.get(`/parishes/${parishId}/history`);
-      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
+      setHistory(hRes.data.map((h: { id: number; entry_type: string; description: string; created_at: string; undone?: string; user_email?: string; user_name?: string }) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
     } catch (err) { console.error(err); }
   };
 
@@ -172,7 +185,7 @@ export default function DashboardPage() {
       setTodos((p) => [...p, { id: t.id, text: t.text, building: t.building, priority: t.priority, prevPriority: t.prev_priority, done: t.done, createdAt: t.created_at }]);
       // Refresh history
       const hRes = await api.get(`/parishes/${parishId}/history`);
-      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
+      setHistory(hRes.data.map((h: { id: number; entry_type: string; description: string; created_at: string; undone?: string; user_email?: string; user_name?: string }) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
       setNewTaskText(""); setNewTaskBuilding(""); setNewTaskPriority("green"); setShowAddTask(false);
     } catch (err) { console.error(err); }
   };
@@ -187,7 +200,7 @@ export default function DashboardPage() {
       const t = res.data;
       setTodos((prev) => prev.map((x) => x.id === id ? { id: t.id, text: t.text, building: t.building, priority: t.priority, prevPriority: t.prev_priority, done: t.done, createdAt: t.created_at } : x));
       const hRes = await api.get(`/parishes/${parishId}/history`);
-      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
+      setHistory(hRes.data.map((h: { id: number; entry_type: string; description: string; created_at: string; undone?: string; user_email?: string; user_name?: string }) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
       setEditingTaskId(null);
       showToast("Task updated");
     } catch (err) { console.error(err); showToast("Failed to update task", "error"); }
@@ -200,7 +213,7 @@ export default function DashboardPage() {
       await api.delete(`/parishes/${parishId}/todos/${id}`);
       setTodos((p) => p.filter((x) => x.id !== id));
       const hRes = await api.get(`/parishes/${parishId}/history`);
-      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
+      setHistory(hRes.data.map((h: { id: number; entry_type: string; description: string; created_at: string; undone?: string; user_email?: string; user_name?: string }) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
     } catch (err) { console.error(err); }
   };
 
@@ -213,11 +226,11 @@ export default function DashboardPage() {
       setWorkOrders((p) => [res.data, ...p]);
       showToast(`Work order ${res.data.display_number} created`);
       const hRes = await api.get(`/parishes/${parishId}/history`);
-      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
+      setHistory(hRes.data.map((h: { id: number; entry_type: string; description: string; created_at: string; undone?: string; user_email?: string; user_name?: string }) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
       return true;
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      showToast(err?.response?.data?.detail || "Could not create work order", "error");
+      showToast(errorDetail(err) || "Could not create work order", "error");
       return false;
     }
   };
@@ -288,8 +301,8 @@ export default function DashboardPage() {
           setUploadProgress({ ...progress });
           addHistory("upload", `Uploaded ${uploadType} document: ${file.name}`);
           successCount++;
-        } catch (err: any) {
-          progress[file.name] = { status: "error", progress: 100, msg: err?.response?.data?.detail || "Failed" };
+        } catch (err) {
+          progress[file.name] = { status: "error", progress: 100, msg: errorDetail(err) || "Failed" };
           setUploadProgress({ ...progress });
         }
       }
@@ -302,10 +315,10 @@ export default function DashboardPage() {
       ]);
       setUtilities(uRes.data);
       setAppraisals(aRes.data);
-      setHistory(hRes.data.map((h: any) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
+      setHistory(hRes.data.map((h: { id: number; entry_type: string; description: string; created_at: string; undone?: string; user_email?: string; user_name?: string }) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
       setUploadMsg(`${successCount}/${stagedFiles.length} files uploaded successfully`);
       setStagedFiles([]);
-    } catch (err: any) {
+    } catch {
       setUploadMsg("Upload batch failed");
     } finally {
       setUploading(false);
@@ -378,7 +391,7 @@ export default function DashboardPage() {
   };
 
   // ── Utility bill edit/delete ──
-  const editUtilityBill = async (billId: number, updates: Record<string, any>) => {
+  const editUtilityBill = async (billId: number, updates: Record<string, unknown>) => {
     try {
       const token = await getAccessTokenSilently();
       setAuthToken(token);
@@ -398,17 +411,7 @@ export default function DashboardPage() {
     } catch (err) { console.error(err); showToast("Failed to delete bill", "error"); }
   };
 
-  const deleteAppraisalDoc = async (appraisalId: number) => {
-    try {
-      const token = await getAccessTokenSilently();
-      setAuthToken(token);
-      await api.delete(`/data/appraisal/${appraisalId}`);
-      showToast("Appraisal deleted");
-      refreshData();
-    } catch (err) { console.error(err); showToast("Failed to delete", "error"); }
-  };
-
-  const editAppraisal = async (appraisalId: number, updates: Record<string, any>) => {
+  const editAppraisal = async (appraisalId: number, updates: Record<string, unknown>) => {
     try {
       const token = await getAccessTokenSilently();
       setAuthToken(token);
@@ -449,6 +452,16 @@ export default function DashboardPage() {
   };
 
   // ══════════════════════════════════════════
+  const transitionOrder = async (id: number, action: WorkOrderAction, notes?: string) => {
+    try {
+      setAuthToken(await getAccessTokenSilently());
+      await api.post(`/parishes/${parishId}/work-orders/${id}/${action}`, action === "submit" ? { completion_notes: notes } : {});
+      await refreshData();
+      showToast("Work order updated");
+      return true;
+    } catch (error) { showToast(errorDetail(error) || "Could not update work order", "error"); return false; }
+  };
+
   // Derived data
   // ══════════════════════════════════════════
 
@@ -487,7 +500,7 @@ export default function DashboardPage() {
   const buildingVals = useMemo(() => {
     if (!appraisals.length) return [];
     // Group all entries by building name
-    const byBuilding: Record<string, any[]> = {};
+    const byBuilding: Record<string, Appraisal[]> = {};
     for (const a of appraisals) {
       const name = a.building_name || "Unknown";
       if (!byBuilding[name]) byBuilding[name] = [];
@@ -495,7 +508,7 @@ export default function DashboardPage() {
     }
     // For each building, sort by date and take latest + previous
     return Object.entries(byBuilding).map(([name, entries], i) => {
-      const sorted = entries.sort((a: any, b: any) => new Date(a.appraisal_date || 0).getTime() - new Date(b.appraisal_date || 0).getTime());
+      const sorted = entries.sort((a, b) => new Date(a.appraisal_date || 0).getTime() - new Date(b.appraisal_date || 0).getTime());
       const lat = sorted[sorted.length - 1];
       const prev = sorted.length > 1 ? sorted[sorted.length - 2] : null;
       const val = lat.building_value || lat.total_valuation || 0;
@@ -509,16 +522,16 @@ export default function DashboardPage() {
     });
   }, [appraisals]);
 
-  const totalVal = buildingVals.reduce((s: number, b: any) => s + b.value, 0);
+  const totalVal = buildingVals.reduce((s: number, b) => s + b.value, 0);
   const totalValPct = useMemo(() => {
     if (appraisals.length < 2) return null;
     // Get unique appraisal dates
-    const dates = Array.from(new Set<string>(appraisals.map((a: any) => a.appraisal_date || ""))).filter(Boolean).sort();
+    const dates = Array.from(new Set<string>(appraisals.map((a) => a.appraisal_date || ""))).filter(Boolean).sort();
     if (dates.length < 2) return null;
     const latestDate = dates[dates.length - 1];
     const prevDate = dates[dates.length - 2];
-    const latestTotal = appraisals.filter((a: any) => a.appraisal_date === latestDate).reduce((s: number, a: any) => s + (a.building_value || a.total_valuation || 0), 0);
-    const prevTotal = appraisals.filter((a: any) => a.appraisal_date === prevDate).reduce((s: number, a: any) => s + (a.building_value || a.total_valuation || 0), 0);
+    const latestTotal = appraisals.filter((a) => a.appraisal_date === latestDate).reduce((s: number, a) => s + (a.building_value || a.total_valuation || 0), 0);
+    const prevTotal = appraisals.filter((a) => a.appraisal_date === prevDate).reduce((s: number, a) => s + (a.building_value || a.total_valuation || 0), 0);
     return prevTotal > 0 ? ((latestTotal - prevTotal) / prevTotal) * 100 : null;
   }, [appraisals]);
 
@@ -559,7 +572,6 @@ export default function DashboardPage() {
   }, [history]);
 
   const todoBuildings = useMemo(() => [...new Set(todos.map((t) => t.building))].sort(), [todos]);
-  const hasTemplate = templates.some((t: any) => t.is_default);
 
   // ══════════════════════════════════════════
   // Render
@@ -574,8 +586,11 @@ export default function DashboardPage() {
     </div>
   );
 
+  if (loadError) return <main className="p-8"><p role="alert">{loadError}</p><button onClick={() => navigate("/parishes")}>Back to parishes</button></main>;
+
   return (
     <>
+      {membersOpen && isAdmin && parishId && <ManageMembersModal parishId={parishId} parishName={parish?.name || "Parish"} onClose={() => setMembersOpen(false)} onChanged={refreshData} />}
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap" rel="stylesheet" />
 
       <div className="min-h-screen bg-stone-50" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -617,7 +632,7 @@ export default function DashboardPage() {
                 <div className="absolute inset-0 rounded-xl bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                   <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 </div>
-                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                <input type="file" accept="image/*" className="hidden" disabled={!isAdmin} onChange={handleImageUpload} />
               </label>
               <div className="flex-1 min-w-0">
                 {editingName ? (
@@ -628,14 +643,14 @@ export default function DashboardPage() {
                     <button onClick={() => setEditingName(false)} className="text-stone-400 text-sm">Cancel</button>
                   </div>
                 ) : (
-                  <h2 onClick={() => { setEditingName(true); setNameInput(parish?.name || ""); }} className="text-xl font-bold text-stone-800 truncate cursor-pointer hover:text-stone-600 transition-colors" style={{ fontFamily: "'Fraunces', serif" }} title="Click to rename">
+                  <h2 onClick={() => { if (!isAdmin) return; setEditingName(true); setNameInput(parish?.name || ""); }} className="text-xl font-bold text-stone-800 truncate cursor-pointer hover:text-stone-600 transition-colors" style={{ fontFamily: "'Fraunces', serif" }} title="Click to rename">
                     {parish?.name || "Untitled Parish"}
                   </h2>
                 )}
                 <p className="text-sm text-stone-400 mt-0.5">{parish?.diocese}{parish?.address ? ` · ${parish.address}` : ""}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs text-stone-400">{buildings.length} building{buildings.length !== 1 ? "s" : ""}</span>
-                  <button onClick={() => setShowBuildingMgmt(!showBuildingMgmt)}
+                  <button disabled={!isAdmin} onClick={() => setShowBuildingMgmt(!showBuildingMgmt)}
                     className="text-xs text-blue-600 hover:text-blue-700 font-medium">
                     {showBuildingMgmt ? "Close ▴" : "Manage ▾"}
                   </button>
@@ -648,7 +663,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Building management dropdown */}
-            {showBuildingMgmt && (
+            {isAdmin && showBuildingMgmt && (
               <div className="border-t border-stone-100 px-5 py-3 bg-stone-50/50">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-xs font-semibold text-stone-600">Buildings</h4>
@@ -696,9 +711,9 @@ export default function DashboardPage() {
             )}
 
             {/* Upload bar */}
-            <div className="border-t border-stone-100 px-5 py-3 bg-stone-50/50">
+            {isAdmin && <div className="border-t border-stone-100 px-5 py-3 bg-stone-50/50">
               <div className="flex items-center gap-3">
-                <span className="text-xs text-stone-500">Upload:</span>
+                <button onClick={() => setMembersOpen(true)} className="border rounded px-3 py-1 text-xs">Manage Members</button><span className="text-xs text-stone-500">Upload:</span>
                 <div className="flex rounded-lg border border-stone-200 overflow-hidden">
                   {(["utility", "appraisal"] as const).map((t) => (
                     <button key={t} onClick={() => { setUploadType(t); setStagedFiles([]); setUploadProgress({}); setUploadMsg(""); }}
@@ -748,7 +763,7 @@ export default function DashboardPage() {
                   })}
                 </div>
               )}
-            </div>
+            </div>}
 
             {/* Tabs */}
             <div className="border-t border-stone-100 px-5 flex gap-0 overflow-x-auto">
@@ -766,8 +781,8 @@ export default function DashboardPage() {
 
         {/* ═══ Tab Content ═══ */}
         <div className="max-w-7xl mx-auto px-6 py-4">
-          {activeTab === "dashboard" && <DashboardTab
-            utilities={utilities} appraisals={appraisals} todos={todos} history={history}
+          {activeTab === "dashboard" && <DashboardTab canEdit={canEdit}
+            utilities={utilities} todos={todos}
             utilMonthly={utilMonthly} allMonths={allMonths} buildingVals={buildingVals}
             totalVal={totalVal} totalValPct={totalValPct}
             prioCounts={prioCounts} estMonthly={estMonthly}
@@ -779,7 +794,7 @@ export default function DashboardPage() {
             newTaskPriority={newTaskPriority} setNewTaskPriority={setNewTaskPriority}
             addTask={addTask} buildings={buildings} workOrders={workOrders}
           />}
-          {activeTab === "risks" && <RisksTab
+          {activeTab === "risks" && <RisksTab role={role} subject={user?.sub} transitionOrder={transitionOrder} canEdit={canEdit} canDelete={isAdmin}
             todos={todos} toggleTodo={toggleTodo} todoBuildings={todoBuildings}
             showAddTask={showAddTask} setShowAddTask={setShowAddTask}
             newTaskText={newTaskText} setNewTaskText={setNewTaskText}
@@ -791,11 +806,11 @@ export default function DashboardPage() {
             setEditTaskText={setEditTaskText} setEditTaskPriority={setEditTaskPriority} setEditTaskBuilding={setEditTaskBuilding} deleteTask={deleteTask}
             workOrders={workOrders} createWorkOrder={createWorkOrder}
           />}
-          {activeTab === "assets" && <AssetsTab parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} showToast={showToast} onChanged={refreshHistory} />}
-          {activeTab === "utility" && <UtilityTab utilities={utilities} utilBuildings={utilBuildings} utilBuildingData={utilBuildingData} allMonths={allMonths} buildings={buildings} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} setBuildings={setBuildings} refreshData={refreshData} editUtilityBill={editUtilityBill} deleteUtilityBill={deleteUtilityBill} showToast={showToast} />}
-          {activeTab === "valuations" && <ValuationsTab buildingVals={buildingVals} totalVal={totalVal} totalValPct={totalValPct} appraisals={appraisals} buildings={buildings} editAppraisal={editAppraisal} />}
+          {activeTab === "assets" && <AssetsTab canManage={isAdmin} canAttach={canEdit} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} showToast={showToast} onChanged={refreshHistory} />}
+          {activeTab === "utility" && <UtilityTab canEdit={isAdmin} utilities={utilities} utilBuildings={utilBuildings} utilBuildingData={utilBuildingData} allMonths={allMonths} buildings={buildings} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} setBuildings={setBuildings} refreshData={refreshData} editUtilityBill={editUtilityBill} deleteUtilityBill={deleteUtilityBill} showToast={showToast} />}
+          {activeTab === "valuations" && <ValuationsTab canEdit={isAdmin} buildingVals={buildingVals} totalVal={totalVal} totalValPct={totalValPct} appraisals={appraisals} buildings={buildings} editAppraisal={editAppraisal} />}
           {activeTab === "finances" && <FinancesTab utilities={utilities} estMonthly={estMonthly} bldgFinances={bldgFinances} todos={todos} />}
-          {activeTab === "history" && <HistoryTab historyByMonth={historyByMonth} historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} history={history} uploadedDocs={uploadedDocs} removeUploadedDoc={removeUploadedDoc} showToast={showToast} utilities={utilities} appraisals={appraisals} editUtilityBill={editUtilityBill} deleteUtilityBill={deleteUtilityBill} editAppraisal={editAppraisal} refreshData={refreshData} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} />}
+          {activeTab === "history" && <HistoryTab canEdit={isAdmin} historyByMonth={historyByMonth} historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} history={history} uploadedDocs={uploadedDocs} removeUploadedDoc={removeUploadedDoc} showToast={showToast} utilities={utilities} appraisals={appraisals} editUtilityBill={editUtilityBill} deleteUtilityBill={deleteUtilityBill} editAppraisal={editAppraisal} refreshData={refreshData} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} />}
         </div>
       </div>
 

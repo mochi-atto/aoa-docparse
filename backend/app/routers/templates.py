@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.auth import verify_token
+from app.auth import current_account, parish_access, parish_admin_access
 from pydantic import BaseModel
 from typing import Optional, List
 from app.models.extraction_template import ExtractionTemplate
@@ -20,6 +20,7 @@ class FieldPattern(BaseModel):
 
 
 class TemplateCreate(BaseModel):
+    parish_id: int
     name: str
     description: Optional[str] = None
     field_patterns: List[FieldPattern]
@@ -50,22 +51,27 @@ class TemplateResponse(BaseModel):
 # --- Endpoints ---
 
 @router.get("/", response_model=List[TemplateResponse])
-def list_templates(db: Session = Depends(get_db), user=Depends(verify_token)):
-    templates = db.query(ExtractionTemplate).order_by(ExtractionTemplate.updated_at.desc()).all()
+def list_templates(parish_id: int, db: Session = Depends(get_db), membership=Depends(parish_access)):
+    templates = db.query(ExtractionTemplate).filter(ExtractionTemplate.parish_id == parish_id).order_by(ExtractionTemplate.updated_at.desc()).all()
     return [_to_response(t) for t in templates]
 
 
 @router.get("/{template_id}", response_model=TemplateResponse)
-def get_template(template_id: int, db: Session = Depends(get_db), user=Depends(verify_token)):
+def get_template(template_id: int, db: Session = Depends(get_db), user=Depends(current_account)):
     template = db.query(ExtractionTemplate).filter(ExtractionTemplate.id == template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
+    if template.parish_id is None:
+        raise HTTPException(status_code=404, detail="Template not found")
+    parish_access(template.parish_id, user, db)
     return _to_response(template)
 
 
 @router.post("/", response_model=TemplateResponse)
-def create_template(data: TemplateCreate, db: Session = Depends(get_db), user=Depends(verify_token)):
+def create_template(data: TemplateCreate, db: Session = Depends(get_db), user=Depends(current_account)):
+    parish_admin_access(parish_access(data.parish_id, user, db))
     template = ExtractionTemplate(
+        parish_id=data.parish_id,
         name=data.name,
         description=data.description,
         field_patterns=[fp.model_dump() for fp in data.field_patterns],
@@ -82,11 +88,14 @@ def update_template(
     template_id: int,
     data: TemplateUpdate,
     db: Session = Depends(get_db),
-    user=Depends(verify_token),
+    user=Depends(current_account),
 ):
     template = db.query(ExtractionTemplate).filter(ExtractionTemplate.id == template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
+    if template.parish_id is None:
+        raise HTTPException(status_code=404, detail="Template not found")
+    parish_admin_access(parish_access(template.parish_id, user, db))
 
     if data.name is not None:
         template.name = data.name
@@ -103,23 +112,29 @@ def update_template(
 
 
 @router.delete("/{template_id}")
-def delete_template(template_id: int, db: Session = Depends(get_db), user=Depends(verify_token)):
+def delete_template(template_id: int, db: Session = Depends(get_db), user=Depends(current_account)):
     template = db.query(ExtractionTemplate).filter(ExtractionTemplate.id == template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
+    if template.parish_id is None:
+        raise HTTPException(status_code=404, detail="Template not found")
+    parish_admin_access(parish_access(template.parish_id, user, db))
     db.delete(template)
     db.commit()
     return {"detail": "Template deleted"}
 
 
 @router.post("/{template_id}/set-default")
-def set_default_template(template_id: int, db: Session = Depends(get_db), user=Depends(verify_token)):
+def set_default_template(template_id: int, db: Session = Depends(get_db), user=Depends(current_account)):
     # Unset all defaults
-    db.query(ExtractionTemplate).update({ExtractionTemplate.is_default: False})
     # Set new default
     template = db.query(ExtractionTemplate).filter(ExtractionTemplate.id == template_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
+    if template.parish_id is None:
+        raise HTTPException(status_code=404, detail="Template not found")
+    parish_admin_access(parish_access(template.parish_id, user, db))
+    db.query(ExtractionTemplate).filter(ExtractionTemplate.parish_id == template.parish_id).update({ExtractionTemplate.is_default: False})
     template.is_default = True
     db.commit()
     return {"detail": f"'{template.name}' is now the default template"}
