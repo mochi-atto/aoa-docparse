@@ -128,3 +128,34 @@ def test_delete_asset_removes_files_and_logs_history(client):
     assert client.get("/api/parishes/1/assets").json() == []
     types = [h["entry_type"] for h in client.get("/api/parishes/1/history").json()]
     assert types.count("asset") == 3 and set(types) == {"asset"}
+
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+
+
+def test_identification_fields_round_trip_and_clear(client):
+    a = client.post("/api/parishes/1/assets", json={**BODY, "serial_number": "SN-123", "model_number": "XR14"}).json()
+    assert a["serial_number"] == "SN-123" and a["model_number"] == "XR14" and a["has_photo"] is False
+    a = client.put(f"/api/parishes/1/assets/{a['id']}", json={"serial_number": None}).json()
+    assert a["serial_number"] is None and a["model_number"] == "XR14"
+
+
+def test_photo_upload_replace_download_delete(client):
+    aid = client.post("/api/parishes/1/assets", json=BODY).json()["id"]
+    url = f"/api/parishes/1/assets/{aid}/photo"
+    assert client.get(url).status_code == 404
+    a = client.post(url, files={"file": ("unit.png", PNG, "image/png")}).json()
+    assert a["has_photo"] is True
+    f = client.get(url)
+    assert f.status_code == 200 and f.content == PNG and f.headers["content-type"] == "image/png"
+    jpg = b"\xff\xd8\xff\xe0" + b"\x00" * 16
+    client.post(url, files={"file": ("unit.jpg", jpg, "image/jpeg")})
+    assert client.get(url).headers["content-type"] == "image/jpeg"
+    assert client.delete(url).json()["has_photo"] is False
+    assert client.get(url).status_code == 404
+
+
+def test_photo_rejects_non_images(client):
+    aid = client.post("/api/parishes/1/assets", json=BODY).json()["id"]
+    r = client.post(f"/api/parishes/1/assets/{aid}/photo", files={"file": ("m.pdf", b"%PDF-fake", "application/pdf")})
+    assert r.status_code == 422
