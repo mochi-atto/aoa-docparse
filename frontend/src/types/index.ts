@@ -51,6 +51,9 @@ export interface Asset {
   asset_type: string | null;
   location: string;
   manufacturer: string | null;
+  serial_number: string | null;
+  model_number: string | null;
+  has_photo: boolean;
   year_installed: number;
   expected_life: number;
   initial_cost: number;

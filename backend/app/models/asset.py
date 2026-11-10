@@ -14,6 +14,10 @@ class Asset(Base):
     asset_type = Column(String, nullable=True)  # e.g. "HVAC unit"; drives suggestions + manual lookup
     location = Column(String, nullable=False)
     manufacturer = Column(String, nullable=True)
+    serial_number = Column(String, nullable=True)
+    model_number = Column(String, nullable=True)
+    # TEMPORARY: path under the local upload dir for the identification photo (see temp_asset_storage)
+    photo_path = Column(String, nullable=True)
     year_installed = Column(Integer, nullable=False)
     expected_life = Column(Integer, nullable=False)  # years
     initial_cost = Column(Float, nullable=False)
