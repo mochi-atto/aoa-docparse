@@ -1,7 +1,8 @@
 import type { WorkOrderAction } from "./dashboard/WorkOrderActions";
 import ManageMembersModal from "../components/ManageMembersModal";
-import { memberApi, type ParishRole } from "../services/api";
+import { exportApi, memberApi, type ParishRole } from "../services/api";
 import { errorDetail } from "../services/errors";
+import { blobErrorMessage, filenameFromDisposition, saveBlob } from "../services/download";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -18,6 +19,8 @@ import { RisksTab } from "./dashboard/RisksTab";
 import { UtilityTab } from "./dashboard/UtilityTab";
 import { ValuationsTab } from "./dashboard/ValuationsTab";
 
+const secondaryButton = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 disabled:opacity-60 disabled:cursor-wait";
+
 export default function DashboardPage() {
   const { parishId } = useParams<{ parishId: string }>();
   const navigate = useNavigate();
@@ -26,6 +29,8 @@ export default function DashboardPage() {
   const [role, setRole] = useState<ParishRole | null>(null);
   const [membersOpen, setMembersOpen] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
   const isAdmin = role === "admin";
   const canEdit = isAdmin || role === "editor";
 
@@ -336,6 +341,21 @@ export default function DashboardPage() {
       setParish(res.data);
       setEditingName(false);
     } catch (err) { console.error("Failed to rename parish:", err); }
+  };
+
+  // ── Excel export ──
+  const exportParish = async () => {
+    if (!parishId) return;
+    setExporting(true);
+    setExportError("");
+    try {
+      const res = await exportApi.parish(parishId);
+      saveBlob(res.data, filenameFromDisposition(res.headers["content-disposition"], "parish_export.xlsx"));
+    } catch (err) {
+      setExportError(await blobErrorMessage(err, "Export failed. Please try again."));
+    } finally {
+      setExporting(false);
+    }
   };
 
   // ── Image upload (saved to DB via parish update) ──
@@ -663,6 +683,11 @@ export default function DashboardPage() {
               <div className="flex-shrink-0 text-right">
                 <p className="text-xs text-stone-400">Last updated</p>
                 <p className="text-sm font-medium text-stone-600">{lastUpdated ? fmtDate(lastUpdated) : "No data yet"}</p>
+                <button onClick={exportParish} disabled={exporting} aria-busy={exporting} className={`${secondaryButton} mt-2`}>
+                  {exporting && <span className="w-3 h-3 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />}
+                  {exporting ? "Exporting…" : "Export to Excel"}
+                </button>
+                {exportError && <p role="alert" className="text-xs text-red-500 mt-1 max-w-56 ml-auto">{exportError}</p>}
               </div>
             </div>
 
@@ -728,7 +753,7 @@ export default function DashboardPage() {
             {/* Upload bar */}
             {isAdmin && <div className="border-t border-stone-100 px-5 py-3 bg-stone-50/50">
               <div className="flex items-center gap-3">
-                <button onClick={() => setMembersOpen(true)} className="border rounded px-3 py-1 text-xs">Manage Members</button><span className="text-xs text-stone-500">Upload:</span>
+                <button onClick={() => setMembersOpen(true)} className={secondaryButton}>Manage Members</button><span className="text-xs text-stone-500">Upload:</span>
                 <div className="flex rounded-lg border border-stone-200 overflow-hidden">
                   {(["utility", "appraisal"] as const).map((t) => (
                     <button key={t} onClick={() => { setUploadType(t); setStagedFiles([]); setUploadProgress({}); setUploadMsg(""); }}

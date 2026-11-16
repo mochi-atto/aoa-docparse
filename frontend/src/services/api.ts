@@ -36,3 +36,6 @@ export const memberApi = {
     api.patch(`/account/parishes/${id}/members/${memberId}`, { role }),
   remove: (id: string, memberId: number) => api.delete(`/account/parishes/${id}/members/${memberId}`),
 };
+export const exportApi = {
+  parish: (id: string) => api.get<Blob>(`/parishes/${id}/export`, { responseType: "blob" }),
+};
