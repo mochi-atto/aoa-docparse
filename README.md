@@ -22,6 +22,7 @@ This system helps diocesan property managers track utility costs and building va
 - **Inline Editing** — Edit any utility bill field directly from the utility tab or history tab. Changes are logged automatically.
 - **History & Audit Trail** — All mutations (uploads, edits, deletions, task changes) are logged with timestamps. Removed data shows as greyed/strikethrough rather than disappearing.
 - **Task Management** — Track maintenance tasks per building with priority levels (Overdue, At Risk, Due Soon, Addressed).
+- **Excel Export** — Download all of a parish's data as one `.xlsx` workbook (one sheet per record type). Any parish member can export; only admins get the Access sheet with member emails.
 - **Toast Notifications** — Visual feedback for all actions.
 
 ## Tech Stack
@@ -48,7 +49,8 @@ parish-document-parser/
 │   │   │   ├── AppraisalEntryPage.tsx    # PDF preview + guided form
 │   │   │   └── AccountPage.tsx           # Profile, password, delete
 │   │   ├── services/
-│   │   │   └── api.ts                    # Axios instance + auth
+│   │   │   ├── api.ts                    # Axios instance + auth
+│   │   │   └── download.ts               # File download + blob error helpers
 │   │   └── App.tsx                       # Routes
 │   └── package.json
 ├── backend/
@@ -65,9 +67,12 @@ parish-document-parser/
 │   │   │   ├── upload.py                # File upload + LLM parsing
 │   │   │   ├── assets.py                # Asset CRUD + documents + manual lookup
 │   │   │   ├── data.py                  # Utility/appraisal data + edit/delete
+│   │   │   ├── export.py                # Parish Excel export
 │   │   │   └── parish_data.py           # Todos + history
 │   │   ├── schemas/
 │   │   │   └── documents.py
+│   │   ├── services/
+│   │   │   └── parish_export.py         # Builds the export workbook (openpyxl)
 │   │   ├── parsers/
 │   │   │   ├── utility_parser.py        # OpenAI-based extraction
 │   │   │   └── appraisal_parser.py      # Local text extraction
@@ -207,6 +212,16 @@ On the Utility tab, the amber **Account Management** panel lets you:
 - **History tab**: Click "View/Edit ▾" on any upload entry to see and edit all records from that file.
 - All edits are logged to the history timeline.
 
+### Exporting Data
+
+Click **Export to Excel** on the parish card (under "Last updated") to download `<parish-name>_export_<YYYY-MM-DD>.xlsx` with sheets for Buildings, Appraisals, Utilities, Assets, Work Orders and Access.
+
+- **Who can export**: any admin, editor or viewer of the parish. The **Access** sheet (member emails and roles) is included for admins only.
+- **Dates** are real Excel date cells in **UTC**, stated in each header. Buildings, appraisals, utility bills and members only record when they were created, so those sheets have no "Updated" column.
+- **Building links**: appraisals, bills and assets store building *names*, so the export fills in the Building ID by matching the name (case-insensitive) and leaves it blank when no building matches — e.g. after a rename.
+- **Usage** gets one column per unit found, e.g. `Usage (kWh)`, `Usage (therms)`.
+- Work order notes and asset document names are listed in a single cell per row, one per line.
+
 ### Utility Type Normalization
 
 The system normalizes utility types from LLM output:
@@ -258,6 +273,9 @@ The system normalizes utility types from LLM output:
 - `DELETE /api/parishes/{id}/assets/{aid}/documents/{did}` — Remove a document
 - `GET /api/parishes/{id}/assets/manual-lookup?asset_type=&manufacturer=` — **Temporary** sample-catalog lookup
 
+### Export
+- `GET /api/parishes/{id}/export` — Download the parish as `.xlsx` (Access sheet for admins only). Returns 403 "You don't have access to this parish" for non-members and 404 if the parish doesn't exist.
+
 ### Temporary pieces (replace before production)
 
 | Piece | Where | What it does now | Needs |
@@ -271,7 +289,7 @@ The UI marks both with amber "Temporary" badges.
 
 ```bash
 cd backend
-python -m pytest tests/test_assets_api.py
+python -m pytest tests/test_assets_api.py tests/test_export.py
 ```
 
 Uses in-memory SQLite and a temp upload directory; no Postgres or Auth0 needed.
