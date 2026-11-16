@@ -809,7 +809,7 @@ export default function DashboardPage() {
             newTaskPriority={newTaskPriority} setNewTaskPriority={setNewTaskPriority}
             addTask={addTask} buildings={buildings} workOrders={workOrders}
           />}
-          {activeTab === "risks" && <RisksTab role={role} subject={user?.sub} transitionOrder={transitionOrder} canEdit={canEdit} canDelete={isAdmin}
+          {activeTab === "risks" && <RisksTab parishId={parishId} role={role} subject={user?.sub} transitionOrder={transitionOrder} canEdit={canEdit} canDelete={isAdmin}
             todos={todos} toggleTodo={toggleTodo} todoBuildings={todoBuildings}
             showAddTask={showAddTask} setShowAddTask={setShowAddTask}
             newTaskText={newTaskText} setNewTaskText={setNewTaskText}

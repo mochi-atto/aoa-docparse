@@ -38,5 +38,12 @@ class WorkOrder(Base):
     parish = relationship("Parish", back_populates="work_orders")
     building = relationship("Building")
 
+    notes = relationship(
+        "WorkOrderNote",
+        order_by="WorkOrderNote.created_at",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
 
 
