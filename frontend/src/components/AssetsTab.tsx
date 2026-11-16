@@ -15,7 +15,7 @@ const SORT_VALUE: Record<SortKey, (a: Asset) => string | number> = {
   annual_accrual: (a) => a.annual_accrual, docs: (a) => a.documents.length,
 };
 
-const EMPTY_FORM = { name: "", asset_type: "", location: "", manufacturer: "", year_installed: String(THIS_YEAR), expected_life: "", initial_cost: "" };
+const EMPTY_FORM = { name: "", asset_type: "", location: "", manufacturer: "", model_number: "", serial_number: "", year_installed: String(THIS_YEAR), expected_life: "", initial_cost: "" };
 const EMPTY_FACTORS = { safety: false, ops: false, capital: false, warranty: false };
 
 /** TEMPORARY pill: marks features backed by stand-in implementations. */
@@ -23,7 +23,42 @@ function TempBadge({ children = "Temporary" }: { children?: string }) {
   return <span className="inline-block px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-semibold uppercase tracking-wide">{children}</span>;
 }
 
+/** Identification photo; fetched with the auth header, so it can't be a plain <img src>. */
+function AssetPhoto({ base, asset, className }: { base: string; asset: Asset; className: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (!asset.has_photo) return;
+    let url: string | null = null, cancelled = false;
+    api.get(`${base}/${asset.id}/photo`, { responseType: "blob" })
+      .then((r) => { if (!cancelled) { url = URL.createObjectURL(r.data); setSrc(url); } })
+      .catch(() => setSrc(null));
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
+  }, [base, asset.id, asset.has_photo]);
+  if (!asset.has_photo || !src) return null;
+  return <img src={src} alt={`${asset.name} photo`} className={className} />;
+}
+
+/** Styled replacement for the browser's native file input: button + chosen file names + clear. */
+function FilePicker({ id, label, accept, multiple, files, onChange }: { id: string; label: string; accept?: string; multiple?: boolean; files: File[]; onChange: (f: File[]) => void }) {
+  return (
+    <div className="flex items-center gap-3 min-w-0">
+      <label htmlFor={id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-300 bg-white text-sm font-medium text-stone-700 hover:bg-stone-100 hover:border-stone-400 cursor-pointer flex-shrink-0 focus-within:ring-2 focus-within:ring-stone-300">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16" /></svg>
+        {label}
+        <input id={id} type="file" accept={accept} multiple={multiple} className="sr-only" onChange={(e) => { onChange([...(e.target.files || [])]); e.target.value = ""; }} />
+      </label>
+      {files.length === 0
+        ? <span className="text-sm text-stone-400">{multiple ? "No files chosen" : "No file chosen"}</span>
+        : <span className="flex items-center gap-2 min-w-0 text-sm text-stone-600">
+            <span className="truncate">{files.length === 1 ? files[0].name : `${files.length} files: ${files.map((f) => f.name).join(", ")}`}</span>
+            <button type="button" onClick={() => onChange([])} aria-label="Clear selection" className="text-stone-400 hover:text-red-500 flex-shrink-0">✕</button>
+          </span>}
+    </div>
+  );
+}
+
 interface Props {
+  buildings: { id: number; name: string }[];
   canManage: boolean;
   canAttach: boolean;
   parishId: string | undefined;
@@ -32,7 +67,7 @@ interface Props {
   onChanged: () => void; // refresh dashboard history after a change
 }
 
-export default function AssetsTab({ parishId, getAccessTokenSilently, showToast, onChanged, canManage, canAttach }: Props) {
+export default function AssetsTab({ buildings, parishId, getAccessTokenSilently, showToast, onChanged, canManage, canAttach }: Props) {
   const base = `/parishes/${parishId}/assets`;
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +82,9 @@ export default function AssetsTab({ parishId, getAccessTokenSilently, showToast,
   const [form, setForm] = useState(EMPTY_FORM);
   const [factors, setFactors] = useState(EMPTY_FACTORS);
   const [files, setFiles] = useState<File[]>([]);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const photoPreview = useMemo(() => (photo ? URL.createObjectURL(photo) : null), [photo]);
+  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
   const [saving, setSaving] = useState(false);
   const [dismissed, setDismissed] = useState<{ life: boolean; cost: boolean }>({ life: false, cost: false });
   // TEMPORARY manual lookup results for the form (sample catalog names)
@@ -76,7 +114,7 @@ export default function AssetsTab({ parishId, getAccessTokenSilently, showToast,
     const q = search.trim().toLowerCase();
     return assets
       .filter((a) => !locFilter || a.location === locFilter)
-      .filter((a) => !q || [a.name, a.location, a.manufacturer || ""].some((s) => s.toLowerCase().includes(q)))
+      .filter((a) => !q || [a.name, a.location, a.manufacturer || "", a.model_number || "", a.serial_number || ""].some((s) => s.toLowerCase().includes(q)))
       .sort((a, b) => { const x = SORT_VALUE[sort.key](a), y = SORT_VALUE[sort.key](b); return (x > y ? 1 : x < y ? -1 : 0) * sort.dir; });
   }, [assets, search, locFilter, sort]);
   const stats = {
@@ -111,18 +149,23 @@ export default function AssetsTab({ parishId, getAccessTokenSilently, showToast,
     return () => clearTimeout(t);
   }, [showForm, form.asset_type, form.manufacturer, authed, base]);
 
-  const closeForm = () => { setShowForm(false); setForm(EMPTY_FORM); setFactors(EMPTY_FACTORS); setFiles([]); setFound([]); setPicked(new Set()); };
+  const closeForm = () => { setShowForm(false); setForm(EMPTY_FORM); setFactors(EMPTY_FACTORS); setFiles([]); setPhoto(null); setFound([]); setPicked(new Set()); };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     const ok = await run(async () => {
       const created = (await api.post<Asset>(base, {
-        name: form.name.trim(), asset_type: form.asset_type || null, location: form.location.trim(),
-        manufacturer: form.manufacturer.trim() || null, year_installed: year, expected_life: life, initial_cost: cost,
+        name: form.name.trim(), asset_type: form.asset_type || null, location: form.location,
+        manufacturer: form.manufacturer.trim() || null, model_number: form.model_number.trim() || null, serial_number: form.serial_number.trim() || null, year_installed: year, expected_life: life, initial_cost: cost,
         catalog_manuals: [...picked],
       })).data;
       let latest = created;
+      if (photo) {
+        const pd = new FormData();
+        pd.append("file", photo);
+        latest = (await api.post<Asset>(`${base}/${created.id}/photo`, pd)).data;
+      }
       if (files.length) {
         const fd = new FormData();
         files.forEach((f) => fd.append("files", f));
@@ -191,7 +234,7 @@ export default function AssetsTab({ parishId, getAccessTokenSilently, showToast,
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2 p-4 border-b border-stone-100">
-          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search asset, location, manufacturer" className={`${input} w-72`} />
+          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search asset, location, model, serial" className={`${input} w-72`} />
           <select value={locFilter} onChange={(e) => setLocFilter(e.target.value)} className={input}>
             <option value="">All locations</option>
             {locations.map((l) => <option key={l}>{l}</option>)}
@@ -215,14 +258,28 @@ export default function AssetsTab({ parishId, getAccessTokenSilently, showToast,
               <label className="flex flex-col gap-1 text-xs text-stone-500">Asset type
                 <select value={form.asset_type} onChange={setField("asset_type")} className={input}><option value="">Select a type…</option>{ASSET_TYPES.map((t) => <option key={t}>{t}</option>)}</select></label>
               <label className="flex flex-col gap-1 text-xs text-stone-500">Location
-                <input required value={form.location} onChange={setField("location")} placeholder="e.g. Admin Building" className={input} /></label>
+                <select required value={form.location} onChange={setField("location")} className={input}>
+                  <option value="">{buildings.length ? "Select a building…" : "No buildings yet"}</option>
+                  {buildings.map((b) => <option key={b.id} value={b.name}>{b.name}</option>)}
+                </select></label>
               <label className="flex flex-col gap-1 text-xs text-stone-500">Manufacturer
                 <input value={form.manufacturer} onChange={setField("manufacturer")} placeholder="e.g. Trane" className={input} /></label>
+              <label className="flex flex-col gap-1 text-xs text-stone-500">Model number
+                <input value={form.model_number} onChange={setField("model_number")} placeholder="e.g. XR14" className={input} /></label>
+              <label className="flex flex-col gap-1 text-xs text-stone-500">Serial number
+                <input value={form.serial_number} onChange={setField("serial_number")} placeholder="e.g. 1234567A" className={input} /></label>
               <label className="flex flex-col gap-1 text-xs text-stone-500">Year installed
                 <input required type="number" min={1950} max={THIS_YEAR} value={form.year_installed} onChange={setField("year_installed")} className={input} /></label>
               <div className="col-span-2 flex flex-col gap-1 text-xs text-stone-500">
+                <label htmlFor="asset-photo">Photo</label>
+                <div className="flex items-center gap-3">
+                  {photoPreview && <img src={photoPreview} alt="Selected asset" className="w-16 h-16 rounded-lg object-cover border border-stone-200" />}
+                  <FilePicker id="asset-photo" label="Choose photo" accept=".png,.jpg,.jpeg,image/png,image/jpeg" files={photo ? [photo] : []} onChange={(f) => setPhoto(f[0] || null)} />
+                </div>
+              </div>
+              <div className="col-span-2 flex flex-col gap-1 text-xs text-stone-500">
                 <label htmlFor="asset-manuals">Manuals / instructions</label>
-                <input id="asset-manuals" type="file" multiple onChange={(e) => setFiles([...(e.target.files || [])])} className="text-sm" />
+                <FilePicker id="asset-manuals" label="Choose files" multiple accept=".pdf,.txt,.png,.jpg,.jpeg" files={files} onChange={setFiles} />
                 <div className="text-stone-400 flex items-center gap-1.5"><TempBadge>Temporary storage</TempBadge> Files are kept on the API server's local disk until real file storage is added.</div>
                 {found.length > 0 && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 mt-1 space-y-1">
@@ -302,7 +359,10 @@ export default function AssetsTab({ parishId, getAccessTokenSilently, showToast,
                 );
                 return (
                   <tr key={a.id}>
-                    <td className="px-3 py-2.5"><div className={`font-medium ${nameCls}`}>{a.name}</div><div className="text-xs text-stone-400">Installed {a.year_installed}</div></td>
+                    <td className="px-3 py-2.5"><div className="flex items-center gap-2.5">
+                      <AssetPhoto base={base} asset={a} className="w-10 h-10 rounded-md object-cover border border-stone-200 flex-shrink-0" />
+                      <div><div className={`font-medium ${nameCls}`}>{a.name}</div>
+                        <div className="text-xs text-stone-400">Installed {a.year_installed}{a.model_number ? ` · Model ${a.model_number}` : ""}{a.serial_number ? ` · S/N ${a.serial_number}` : ""}</div></div></div></td>
                     <td className="px-3 py-2.5">{a.location}</td>
                     <td className="px-3 py-2.5">{a.manufacturer || "—"}</td>
                     <td className="px-3 py-2.5 text-right">{a.expected_life} yrs</td>

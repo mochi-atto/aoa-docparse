@@ -80,6 +80,7 @@ export default function DashboardPage() {
   // Building management
   const [showBuildingMgmt, setShowBuildingMgmt] = useState(false);
   const [newBuildingName, setNewBuildingName] = useState("");
+  const [showAddBuilding, setShowAddBuilding] = useState(false);
   const [confirmDeleteBuilding, setConfirmDeleteBuilding] = useState<number | null>(null);
   const [renamingBuilding, setRenamingBuilding] = useState<{ id: number; name: string } | null>(null);
 
@@ -362,6 +363,7 @@ export default function DashboardPage() {
       const res = await api.post(`/parishes/${parishId}/buildings`, { name: newBuildingName.trim() });
       setBuildings((prev: BuildingData[]) => [...prev, res.data]);
       setNewBuildingName("");
+      setShowAddBuilding(false);
       showToast(`Building "${res.data.name}" added`);
     } catch (err) { console.error(err); showToast("Failed to add building", "error"); }
   };
@@ -650,6 +652,8 @@ export default function DashboardPage() {
                 <p className="text-sm text-stone-400 mt-0.5">{parish?.diocese}{parish?.address ? ` · ${parish.address}` : ""}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs text-stone-400">{buildings.length} building{buildings.length !== 1 ? "s" : ""}</span>
+                  <button disabled={!isAdmin} onClick={() => setShowAddBuilding(true)}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-stone-300 text-white px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm">+ Add building</button>
                   <button disabled={!isAdmin} onClick={() => setShowBuildingMgmt(!showBuildingMgmt)}
                     className="text-xs text-blue-600 hover:text-blue-700 font-medium">
                     {showBuildingMgmt ? "Close ▴" : "Manage ▾"}
@@ -662,18 +666,29 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Add building prompt */}
+            {isAdmin && showAddBuilding && (
+              <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => { setShowAddBuilding(false); setNewBuildingName(""); }}>
+                <form className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}
+                  onSubmit={(e) => { e.preventDefault(); addBuilding(); }}>
+                  <h3 className="text-base font-semibold text-stone-800" style={{ fontFamily: "'Fraunces', serif" }}>Add building</h3>
+                  <label className="flex flex-col gap-1 text-xs text-stone-500 mt-3">Building name
+                    <input value={newBuildingName} onChange={(e) => setNewBuildingName(e.target.value)} autoFocus placeholder="e.g., Parish Hall"
+                      className="border border-stone-300 rounded-lg px-3 py-2 text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300" />
+                  </label>
+                  <div className="flex justify-end gap-2 mt-4">
+                    <button type="button" onClick={() => { setShowAddBuilding(false); setNewBuildingName(""); }} className="px-4 py-2 rounded-lg text-sm border border-stone-300 text-stone-600 hover:bg-stone-50">Cancel</button>
+                    <button type="submit" disabled={!newBuildingName.trim()} className="bg-blue-600 hover:bg-blue-700 disabled:bg-stone-300 text-white px-4 py-2 rounded-lg text-sm font-medium">Add building</button>
+                  </div>
+                </form>
+              </div>
+            )}
+
             {/* Building management dropdown */}
             {isAdmin && showBuildingMgmt && (
               <div className="border-t border-stone-100 px-5 py-3 bg-stone-50/50">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-xs font-semibold text-stone-600">Buildings</h4>
-                  <div className="flex items-center gap-2">
-                    <input value={newBuildingName} onChange={(e) => setNewBuildingName(e.target.value)} placeholder="New building name"
-                      onKeyDown={(e) => e.key === "Enter" && addBuilding()}
-                      className="border border-stone-300 rounded-lg px-2.5 py-1 text-xs w-40 focus:outline-none focus:ring-1 focus:ring-stone-400" />
-                    <button onClick={addBuilding} disabled={!newBuildingName.trim()}
-                      className="bg-stone-800 hover:bg-stone-900 disabled:bg-stone-300 text-white px-2.5 py-1 rounded-lg text-xs font-medium">Add</button>
-                  </div>
                 </div>
                 <div className="space-y-1">
                   {buildings.map((b) => (
@@ -806,7 +821,7 @@ export default function DashboardPage() {
             setEditTaskText={setEditTaskText} setEditTaskPriority={setEditTaskPriority} setEditTaskBuilding={setEditTaskBuilding} deleteTask={deleteTask}
             workOrders={workOrders} createWorkOrder={createWorkOrder}
           />}
-          {activeTab === "assets" && <AssetsTab canManage={isAdmin} canAttach={canEdit} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} showToast={showToast} onChanged={refreshHistory} />}
+          {activeTab === "assets" && <AssetsTab buildings={buildings} canManage={isAdmin} canAttach={canEdit} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} showToast={showToast} onChanged={refreshHistory} />}
           {activeTab === "utility" && <UtilityTab canEdit={isAdmin} utilities={utilities} utilBuildings={utilBuildings} utilBuildingData={utilBuildingData} allMonths={allMonths} buildings={buildings} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} setBuildings={setBuildings} refreshData={refreshData} editUtilityBill={editUtilityBill} deleteUtilityBill={deleteUtilityBill} showToast={showToast} />}
           {activeTab === "valuations" && <ValuationsTab canEdit={isAdmin} buildingVals={buildingVals} totalVal={totalVal} totalValPct={totalValPct} appraisals={appraisals} buildings={buildings} editAppraisal={editAppraisal} />}
           {activeTab === "finances" && <FinancesTab utilities={utilities} estMonthly={estMonthly} bldgFinances={bldgFinances} todos={todos} />}

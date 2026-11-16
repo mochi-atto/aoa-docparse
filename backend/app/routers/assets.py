@@ -22,6 +22,8 @@ class AssetCreate(BaseModel):
     asset_type: Optional[str] = None
     location: str = Field(min_length=1)
     manufacturer: Optional[str] = None
+    serial_number: Optional[str] = None
+    model_number: Optional[str] = None
     year_installed: int = Field(ge=1800, le=2200)
     expected_life: int = Field(ge=1, le=500)
     initial_cost: float = Field(ge=0)
@@ -36,6 +38,8 @@ class AssetUpdate(BaseModel):
     asset_type: Optional[str] = None
     location: Optional[str] = Field(default=None, min_length=1)
     manufacturer: Optional[str] = None
+    serial_number: Optional[str] = None
+    model_number: Optional[str] = None
     year_installed: Optional[int] = Field(default=None, ge=1800, le=2200)
     expected_life: Optional[int] = Field(default=None, ge=1, le=500)
     initial_cost: Optional[float] = Field(default=None, ge=0)
@@ -66,6 +70,9 @@ class AssetResponse(BaseModel):
     asset_type: Optional[str]
     location: str
     manufacturer: Optional[str]
+    serial_number: Optional[str]
+    model_number: Optional[str]
+    has_photo: bool
     year_installed: int
     expected_life: int
     initial_cost: float
@@ -95,7 +102,8 @@ def _asset(a: Asset) -> AssetResponse:
     accrual = a.accrual_override if a.accrual_override is not None else a.initial_cost / a.expected_life
     return AssetResponse(
         id=a.id, parish_id=a.parish_id, name=a.name, asset_type=a.asset_type, location=a.location,
-        manufacturer=a.manufacturer, year_installed=a.year_installed, expected_life=a.expected_life,
+        manufacturer=a.manufacturer, serial_number=a.serial_number, model_number=a.model_number,
+        has_photo=a.photo_path is not None, year_installed=a.year_installed, expected_life=a.expected_life,
         initial_cost=a.initial_cost, accrual_override=a.accrual_override, remaining_life=remaining,
         annual_accrual=accrual, documents=[_doc(d) for d in sorted(a.documents, key=lambda d: d.id)],
         created_at=a.created_at,
@@ -138,7 +146,7 @@ def update_asset(parish_id: int, asset_id: int, data: AssetUpdate, db: Session =
     asset = _get_asset(db, parish_id, asset_id)
     changes = data.model_dump(exclude_unset=True)
     for field, value in changes.items():
-        if value is None and field not in ("accrual_override", "asset_type", "manufacturer"):
+        if value is None and field not in ("accrual_override", "asset_type", "manufacturer", "serial_number", "model_number"):
             continue
         setattr(asset, field, value)
     if changes:
@@ -151,7 +159,7 @@ def update_asset(parish_id: int, asset_id: int, data: AssetUpdate, db: Session =
 @router.delete("/{parish_id}/assets/{asset_id}")
 def delete_asset(parish_id: int, asset_id: int, db: Session = Depends(get_db), membership=Depends(parish_admin_access)):
     asset = _get_asset(db, parish_id, asset_id)
-    paths = [d.storage_path for d in asset.documents]
+    paths = [d.storage_path for d in asset.documents] + [asset.photo_path]
     _log(db, parish_id, "asset", f'Asset removed: "{asset.name}"', membership.account.auth0_sub)
     db.delete(asset)
     db.commit()
@@ -165,6 +173,57 @@ def delete_asset(parish_id: int, asset_id: int, db: Session = Depends(get_db), m
 @router.get("/{parish_id}/assets/manual-lookup", response_model=ManualLookupResponse)
 def manual_lookup(parish_id: int, asset_type: Optional[str] = None, manufacturer: Optional[str] = None, membership=Depends(parish_access)):
     return ManualLookupResponse(manuals=temp_manual_lookup.find_manuals(asset_type, manufacturer))
+
+
+# ── Identification photo (TEMPORARY local storage, PNG/JPEG only) ──
+
+def _photo_media_type(path) -> str:
+    return "image/png" if path.read_bytes()[:4] == b"\x89PNG" else "image/jpeg"
+
+
+@router.post("/{parish_id}/assets/{asset_id}/photo", response_model=AssetResponse)
+def upload_photo(parish_id: int, asset_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), membership=Depends(parish_editor_access)):
+    asset = _get_asset(db, parish_id, asset_id)
+    try:
+        path, _ = temp_asset_storage.save_upload(asset.id, file, images_only=True)
+    except temp_asset_storage.InvalidFile:
+        raise HTTPException(status_code=422, detail="Photo must be a valid PNG or JPEG image")
+    except temp_asset_storage.FileTooLarge:
+        raise HTTPException(status_code=413, detail="Photo exceeds the 25 MB limit")
+    old = asset.photo_path
+    asset.photo_path = path
+    _log(db, parish_id, "asset", f'Photo updated for "{asset.name}"', membership.account.auth0_sub)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        temp_asset_storage.delete_path(path)
+        raise
+    temp_asset_storage.delete_path(old)
+    db.refresh(asset)
+    return _asset(asset)
+
+
+@router.get("/{parish_id}/assets/{asset_id}/photo")
+def get_photo(parish_id: int, asset_id: int, db: Session = Depends(get_db), membership=Depends(parish_access)):
+    asset = _get_asset(db, parish_id, asset_id)
+    path = temp_asset_storage.open_path(asset.photo_path) if asset.photo_path else None
+    if not path:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    return FileResponse(path, media_type=_photo_media_type(path), headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store"})
+
+
+@router.delete("/{parish_id}/assets/{asset_id}/photo", response_model=AssetResponse)
+def delete_photo(parish_id: int, asset_id: int, db: Session = Depends(get_db), membership=Depends(parish_editor_access)):
+    asset = _get_asset(db, parish_id, asset_id)
+    old = asset.photo_path
+    asset.photo_path = None
+    if old:
+        _log(db, parish_id, "asset", f'Photo removed from "{asset.name}"', membership.account.auth0_sub)
+    db.commit()
+    temp_asset_storage.delete_path(old)
+    db.refresh(asset)
+    return _asset(asset)
 
 
 # ── Document endpoints (file bytes go through TEMPORARY local storage) ──

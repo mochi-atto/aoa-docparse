@@ -26,6 +26,11 @@ def pending(connection):
         changes.append("ALTER TABLE work_orders ADD COLUMN status_before_hold VARCHAR")
     if "extraction_templates" in tables and "parish_id" not in {c["name"] for c in schema.get_columns("extraction_templates")}:
         changes.append("ALTER TABLE extraction_templates ADD COLUMN parish_id INTEGER REFERENCES parishes(id)")
+    if "assets" in tables:
+        asset_cols = {c["name"] for c in schema.get_columns("assets")}
+        for col in ("serial_number", "model_number", "photo_path"):
+            if col not in asset_cols:
+                changes.append(f"ALTER TABLE assets ADD COLUMN {col} VARCHAR")
     return changes
 
 
