@@ -3,7 +3,7 @@ import type { ParishRole } from "../../services/api";
 import type { Dispatch, SetStateAction } from "react";
 import type { Appraisal, BuildingData, HistoryEntry, TabKey, TodoItem, UtilityBill, WorkOrder, WorkOrderPriority } from "./types";
 
-export interface WorkOrderInput { title: string; description?: string; priority: WorkOrderPriority; due_date?: string; building_id?: number; todo_id?: number; }
+export interface WorkOrderInput { title: string; description?: string; priority: WorkOrderPriority; due_date?: string; building_id?: number; todo_id?: number; asset_id?: number;}
 export interface BuildingValuation { name: string; value: number; sqft: number; perSqft: number; pct: number | null; color: string; }
 export interface HistoryGroup { month: string; entries: HistoryEntry[]; }
 export type BillEditing = { id: number; field: string; value: string } | null;
