@@ -12,7 +12,7 @@ from app.database import Base, engine
 def load_models():
     from app.models import account, appraisal, asset, building, extraction_template
     from app.models import history_entry, parish, parish_member, todo, user_profile, utility_bill, work_order
-
+    from app.models import work_order_note
 
 def pending(connection):
     schema = inspect(connection)

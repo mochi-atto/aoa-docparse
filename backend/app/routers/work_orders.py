@@ -13,6 +13,7 @@ from app.models.todo import Todo
 from app.models.user_profile import UserProfile
 from app.models.history_entry import HistoryEntry
 from app.permissions import CurrentUser, get_current_user
+from app.models.work_order_note import WorkOrderNote
 
 router = APIRouter()
 
@@ -372,3 +373,90 @@ def close_work_order(parish_id: int, order_id: int,
     db.commit()
     db.refresh(order)
     return order
+
+MAX_NOTE_LENGTH = 5000
+
+
+class WorkOrderNoteCreate(BaseModel):
+    body: str
+
+
+class WorkOrderNoteResponse(BaseModel):
+    id: int
+    work_order_id: int
+    author_sub: str
+    author_name: Optional[str]
+    body: str
+    status_at_time: Optional[str]
+    created_at: datetime.datetime
+
+    class Config:
+        from_attributes = True
+
+
+def find_work_order(db: Session, parish_id: int, order_id: int) -> WorkOrder:
+    # Plain lookup without a row lock. get_work_order() locks the row,
+    # which is only needed when changing the order's status.
+    order = (
+        db.query(WorkOrder)
+        .filter(WorkOrder.id == order_id, WorkOrder.parish_id == parish_id)
+        .first()
+    )
+    if order is None:
+        raise HTTPException(status_code=404, detail="Work order not found")
+    return order
+
+
+# list notes on a work order (anyone with parish access)
+@router.get("/{parish_id}/work-orders/{order_id}/notes", response_model=List[WorkOrderNoteResponse])
+def list_work_order_notes(
+    parish_id: int,
+    order_id: int,
+    db: Session = Depends(get_db),
+    membership=Depends(parish_access),
+):
+    order = find_work_order(db, parish_id, order_id)
+    return order.notes
+
+
+# add a note to a work order (editors and admins, any status)
+@router.post("/{parish_id}/work-orders/{order_id}/notes", response_model=WorkOrderNoteResponse)
+def add_work_order_note(
+    parish_id: int,
+    order_id: int,
+    data: WorkOrderNoteCreate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+    membership=Depends(parish_editor_access),
+):
+    order = find_work_order(db, parish_id, order_id)
+
+    body = data.body.strip()
+    if not body:
+        raise HTTPException(status_code=400, detail="Note cannot be empty")
+    if len(body) > MAX_NOTE_LENGTH:
+        raise HTTPException(status_code=400, detail=f"Note must be {MAX_NOTE_LENGTH} characters or fewer")
+
+    author_name = display_name(db, user, membership)
+
+    note = WorkOrderNote(
+        work_order_id=order.id,
+        author_sub=user.sub,
+        author_name=author_name,
+        body=body,
+        status_at_time=order.status,
+    )
+    db.add(note)
+
+    db.add(HistoryEntry(
+        parish_id=parish_id,
+        entry_type="work_order_note_added",
+        description=f"Note added to work order {order.display_number} by: {author_name}",
+        snapshot={"actor_sub": user.sub, "actor_name": author_name},
+        related_type="work_order",
+        related_id=order.id,
+    ))
+
+    db.commit()
+    db.refresh(note)
+    return note
