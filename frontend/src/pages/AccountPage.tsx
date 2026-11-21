@@ -45,7 +45,7 @@ export default function AccountPage() {
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap" rel="stylesheet" />
       <div className="min-h-screen bg-stone-50" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <header className="bg-white border-b border-stone-200 px-6 py-3 flex items-center gap-4 sticky top-0 z-30">
-          <button onClick={() => navigate(-1)} className="text-stone-400 hover:text-stone-600 text-sm">← Back</button>
+          <button onClick={() => navigate(-1)} aria-label="Back to dashboard" className="text-stone-600 hover:text-stone-900 text-sm font-medium">← Back</button>
           <div className="w-px h-5 bg-stone-200" />
           <h1 className="text-lg font-semibold text-stone-800" style={{ fontFamily: "'Fraunces', serif" }}>Account Settings</h1>
         </header>
@@ -57,30 +57,30 @@ export default function AccountPage() {
             <div className="flex items-center gap-4 mb-6">
               <label className="cursor-pointer group relative">
                 <div className="w-16 h-16 rounded-full bg-stone-200 flex items-center justify-center text-2xl font-medium text-stone-600 overflow-hidden">
-                  {profilePic ? <img src={profilePic} alt="" className="w-full h-full object-cover" /> : (user?.name?.[0] || "U").toUpperCase()}
+                  {profilePic ? <img src={profilePic} alt="User profile photo" className="w-full h-full object-cover" /> : (user?.name?.[0] || "U").toUpperCase()}
                 </div>
                 <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                   <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 </div>
-                <input type="file" accept="image/*" className="hidden" onChange={handleProfilePic} />
+                <input type="file" accept="image/*" className="hidden" aria-label="Upload profile photo" onChange={handleProfilePic} />
               </label>
               <div>
-                <p className="text-sm font-medium text-stone-700">{user?.name || "User"}</p>
-                <p className="text-xs text-stone-400">{user?.email}</p>
-                <p className="text-xs text-stone-300 mt-0.5">Click photo to change</p>
+                <p className="text-sm font-medium text-stone-800">{user?.name || "User"}</p>
+                <p className="text-xs text-stone-600">{user?.email}</p>
+                <p className="text-xs text-stone-500 mt-0.5">Click photo to change</p>
               </div>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-medium text-stone-500 block mb-1">Display Name</label>
-                <input value={name} onChange={(e) => setName(e.target.value)}
+                <label htmlFor="account-display-name" className="text-xs font-medium text-stone-700 block mb-1">Display Name</label>
+                <input id="account-display-name" value={name} onChange={(e) => setName(e.target.value)}
                   className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-400" />
               </div>
               <div>
-                <label className="text-xs font-medium text-stone-500 block mb-1">Email</label>
-                <input value={user?.email || ""} disabled
-                  className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm bg-stone-50 text-stone-400" />
-                <p className="text-xs text-stone-400 mt-1">Managed by your authentication provider.</p>
+                <label htmlFor="account-email" className="text-xs font-medium text-stone-700 block mb-1">Email</label>
+                <input id="account-email" value={user?.email || ""} disabled
+                  className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm bg-stone-50 text-stone-600" />
+                <p className="text-xs text-stone-500 mt-1">Managed by your authentication provider.</p>
               </div>
               <button onClick={saveName} disabled={saving || !name.trim()}
                 className="bg-stone-800 hover:bg-stone-900 disabled:bg-stone-300 text-white px-4 py-2 rounded-lg text-sm font-medium">

@@ -1,5 +1,5 @@
 import { useAuth0 } from "@auth0/auth0-react";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import * as pdfjsLib from "pdfjs-dist";
 import api, { setAuthToken } from "../services/api";
@@ -150,11 +150,11 @@ export default function AppraisalEntryPage() {
           </div>
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 text-xs px-2.5 py-1 rounded-full border border-green-200">🔒 Fully local</span>
-            {!pdfFile && <label className="bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-medium cursor-pointer">Select PDF<input type="file" accept=".pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) loadPdf(f); }} /></label>}
+            {!pdfFile && <label className="bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-medium cursor-pointer">Select PDF<input type="file" accept=".pdf" className="hidden" aria-label="Select appraisal PDF" onChange={(e) => { const f = e.target.files?.[0]; if (f) loadPdf(f); }} /></label>}
             <div className="flex items-center gap-1">
-              <button onClick={() => setPdfZoom((z) => Math.max(0.5, z - 0.25))} className="text-xs px-2 py-1 rounded border border-stone-300 hover:bg-stone-100">−</button>
-              <span className="text-xs text-stone-500 w-8 text-center">{Math.round(pdfZoom * 100)}%</span>
-              <button onClick={() => setPdfZoom((z) => Math.min(3, z + 0.25))} className="text-xs px-2 py-1 rounded border border-stone-300 hover:bg-stone-100">+</button>
+              <button onClick={() => setPdfZoom((z) => Math.max(0.5, z - 0.25))} aria-label="Zoom out PDF" className="text-xs px-2 py-1 rounded border border-stone-300 hover:bg-stone-100">−</button>
+              <span className="text-xs text-stone-600 w-8 text-center">{Math.round(pdfZoom * 100)}%</span>
+              <button onClick={() => setPdfZoom((z) => Math.min(3, z + 0.25))} aria-label="Zoom in PDF" className="text-xs px-2 py-1 rounded border border-stone-300 hover:bg-stone-100">+</button>
             </div>
           </div>
         </header>
@@ -167,7 +167,7 @@ export default function AppraisalEntryPage() {
               <p className="text-4xl mb-4">📄</p>
               <h2 className="text-lg font-semibold text-stone-700 mb-2">Load an appraisal document</h2>
               <p className="text-sm text-stone-400 mb-4">The PDF stays in your browser. Copy values and paste into the form.</p>
-              <label className="bg-stone-800 hover:bg-stone-900 text-white px-6 py-3 rounded-lg text-sm font-medium cursor-pointer inline-block">Select PDF<input type="file" accept=".pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) loadPdf(f); }} /></label>
+              <label className="bg-stone-800 hover:bg-stone-900 text-white px-6 py-3 rounded-lg text-sm font-medium cursor-pointer inline-block">Select PDF<input type="file" accept=".pdf" className="hidden" aria-label="Select appraisal PDF" onChange={(e) => { const f = e.target.files?.[0]; if (f) loadPdf(f); }} /></label>
             </div>
           </div>
         )}
@@ -179,13 +179,13 @@ export default function AppraisalEntryPage() {
               <div className="p-4 space-y-4">
                 {pages.map((page, i) => (
                   <div key={i}>
-                    <p className="text-xs text-stone-400 text-center mb-2">— Page {i + 1} —</p>
+                    <p className="text-xs text-stone-500 font-medium text-center mb-2">— Page {i + 1} —</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-white rounded-lg border border-stone-200 p-2 overflow-hidden">
-                        <img src={page.imageSrc} alt="" className="w-full rounded" style={{ transform: `scale(${pdfZoom})`, transformOrigin: "top left" }} />
+                        <img src={page.imageSrc} alt={`Appraisal document page ${i + 1} rendered`} className="w-full rounded" style={{ transform: `scale(${pdfZoom})`, transformOrigin: "top left" }} />
                       </div>
                       <div className="bg-white rounded-lg border border-stone-200 p-3 overflow-auto">
-                        <p className="text-xs text-stone-300 mb-2">Select text → paste into form</p>
+                        <p className="text-xs text-stone-500 font-medium mb-2">Select text → paste into form</p>
                         {page.lines.map((line, j) => (
                           <p key={j} className="text-xs leading-relaxed py-0.5 px-1.5 hover:bg-amber-50 rounded cursor-text select-text font-mono text-stone-700">{line}</p>
                         ))}
@@ -200,44 +200,45 @@ export default function AppraisalEntryPage() {
             <div className="w-[400px] flex-shrink-0 border-l border-stone-200 bg-white overflow-auto">
               <div className="p-5 space-y-5">
                 <div className="bg-blue-50 rounded-lg border border-blue-100 p-3">
-                  <p className="text-xs text-blue-800 font-semibold mb-1">Paste from PDF</p>
-                  <p className="text-xs text-blue-600">Select text on the left, paste here. Dollar signs and commas are stripped automatically.</p>
+                  <p className="text-xs text-blue-900 font-semibold mb-1">Paste from PDF</p>
+                  <p className="text-xs text-blue-700">Select text on the left, paste here. Dollar signs and commas are stripped automatically.</p>
                 </div>
 
                 {/* Document Info */}
                 <fieldset className="border border-stone-200 rounded-lg p-4">
-                  <legend className="text-xs font-semibold text-stone-600 px-1">Document Info</legend>
+                  <legend className="text-xs font-semibold text-stone-700 px-1">Document Info</legend>
                   <div className="space-y-3">
-                    <Fld label="Appraisal Firm" value={appraiserFirm} set={setAppraiserFirm} paste={smartPaste(setAppraiserFirm, "text")} />
+                    <Fld id="fld-appraiser-firm" label="Appraisal Firm" value={appraiserFirm} set={setAppraiserFirm} paste={smartPaste(setAppraiserFirm, "text")} />
                     <div className="grid grid-cols-2 gap-3">
-                      <Fld label="Appraisal Date" value={appraisalDate} set={setAppraisalDate} paste={smartPaste(setAppraisalDate, "date")} type="date" />
-                      <Fld label="Expiration Date" value={expirationDate} set={setExpirationDate} paste={smartPaste(setExpirationDate, "date")} type="date" />
+                      <Fld id="fld-appraisal-date" label="Appraisal Date" value={appraisalDate} set={setAppraisalDate} paste={smartPaste(setAppraisalDate, "date")} type="date" />
+                      <Fld id="fld-expiration-date" label="Expiration Date" value={expirationDate} set={setExpirationDate} paste={smartPaste(setExpirationDate, "date")} type="date" />
                     </div>
-                    <Fld label="Property Address" value={propertyAddress} set={setPropertyAddress} paste={smartPaste(setPropertyAddress, "text")} />
-                    <Fld label="Entity / Property Name" value={entityName} set={setEntityName} paste={smartPaste(setEntityName, "text")} />
+                    <Fld id="fld-property-address" label="Property Address" value={propertyAddress} set={setPropertyAddress} paste={smartPaste(setPropertyAddress, "text")} />
+                    <Fld id="fld-entity-name" label="Entity / Property Name" value={entityName} set={setEntityName} paste={smartPaste(setEntityName, "text")} />
                   </div>
                 </fieldset>
 
                 {/* Buildings */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-stone-700" style={{ fontFamily: "'Fraunces', serif" }}>Buildings</h3>
+                    <h3 className="text-sm font-semibold text-stone-800" style={{ fontFamily: "'Fraunces', serif" }}>Buildings</h3>
                     <button onClick={() => setBuildings((p) => [...p, { key: crypto.randomUUID(), name: "", valuation_number: "", building_value: "", gross_sq_ft: "" }])}
-                      className="text-xs text-stone-500 hover:text-stone-800 font-medium border border-dashed border-stone-300 rounded-full px-2.5 py-1">+ Add</button>
+                      aria-label="Add another building"
+                      className="text-xs text-stone-600 hover:text-stone-900 font-medium border border-dashed border-stone-300 rounded-full px-2.5 py-1">+ Add</button>
                   </div>
                   <div className="space-y-3">
                     {buildings.map((b, idx) => (
                       <fieldset key={b.key} className="border border-stone-200 rounded-lg p-4 relative">
-                        <legend className="text-xs font-semibold text-stone-600 px-1">{b.name || `Building ${idx + 1}`}</legend>
-                        {buildings.length > 1 && <button onClick={() => setBuildings((p) => p.filter((x) => x.key !== b.key))} className="absolute top-2 right-3 text-stone-400 hover:text-red-500 text-xs">✕</button>}
+                        <legend className="text-xs font-semibold text-stone-700 px-1">{b.name || `Building ${idx + 1}`}</legend>
+                        {buildings.length > 1 && <button onClick={() => setBuildings((p) => p.filter((x) => x.key !== b.key))} aria-label={`Remove building ${b.name || idx + 1}`} className="absolute top-2 right-3 text-stone-400 hover:text-red-500 text-xs">✕</button>}
                         <div className="space-y-3">
                           <div className="grid grid-cols-2 gap-3">
-                            <Fld label="Building Name" value={b.name} set={(v) => updateBuilding(b.key, "name", v)} paste={smartPaste((v) => updateBuilding(b.key, "name", v), "text")} />
-                            <Fld label="Valuation ID / Item #" value={b.valuation_number} set={(v) => updateBuilding(b.key, "valuation_number", v)} paste={smartPaste((v) => updateBuilding(b.key, "valuation_number", v), "text")} />
+                            <Fld id={`bldg-name-${b.key}`} label="Building Name" value={b.name} set={(v) => updateBuilding(b.key, "name", v)} paste={smartPaste((v) => updateBuilding(b.key, "name", v), "text")} />
+                            <Fld id={`bldg-val-id-${b.key}`} label="Valuation ID / Item #" value={b.valuation_number} set={(v) => updateBuilding(b.key, "valuation_number", v)} paste={smartPaste((v) => updateBuilding(b.key, "valuation_number", v), "text")} />
                           </div>
                           <div className="grid grid-cols-2 gap-3">
-                            <Fld label="Building Value" value={b.building_value} set={(v) => updateBuilding(b.key, "building_value", v)} paste={smartPaste((v) => updateBuilding(b.key, "building_value", v), "money")} prefix="$" />
-                            <Fld label="Gross Sq Ft" value={b.gross_sq_ft} set={(v) => updateBuilding(b.key, "gross_sq_ft", v)} paste={smartPaste((v) => updateBuilding(b.key, "gross_sq_ft", v), "number")} />
+                            <Fld id={`bldg-val-${b.key}`} label="Building Value" value={b.building_value} set={(v) => updateBuilding(b.key, "building_value", v)} paste={smartPaste((v) => updateBuilding(b.key, "building_value", v), "money")} prefix="$" />
+                            <Fld id={`bldg-sqft-${b.key}`} label="Gross Sq Ft" value={b.gross_sq_ft} set={(v) => updateBuilding(b.key, "gross_sq_ft", v)} paste={smartPaste((v) => updateBuilding(b.key, "gross_sq_ft", v), "number")} />
                           </div>
                         </div>
                       </fieldset>
@@ -261,13 +262,14 @@ export default function AppraisalEntryPage() {
   );
 }
 
-function Fld({ label, value, set, paste, type, prefix }: { label: string; value: string; set: (v: string) => void; paste?: (e: React.ClipboardEvent) => void; type?: string; prefix?: string }) {
+function Fld({ label, value, set, paste, type, prefix, id }: { label: string; value: string; set: (v: string) => void; paste?: (e: React.ClipboardEvent) => void; type?: string; prefix?: string; id?: string }) {
+  const inputId = id || `fld-${label.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
   return (
     <div>
-      <label className="text-xs text-stone-500 block mb-0.5">{label}</label>
+      <label htmlFor={inputId} className="text-xs text-stone-700 font-medium block mb-0.5">{label}</label>
       <div className="relative">
-        {prefix && <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-stone-400">{prefix}</span>}
-        <input type={type || "text"} value={value} onChange={(e) => set(e.target.value)} onPaste={paste}
+        {prefix && <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-stone-500" aria-hidden="true">{prefix}</span>}
+        <input id={inputId} type={type || "text"} value={value} onChange={(e) => set(e.target.value)} onPaste={paste}
           className={`w-full border border-stone-300 rounded-lg py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-stone-400 ${prefix ? "pl-6 pr-2.5" : "px-2.5"}`} />
       </div>
     </div>

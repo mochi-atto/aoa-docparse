@@ -25,10 +25,10 @@ type TabKey = "dashboard" | "utility" | "valuations" | "risks" | "finances" | "h
 // ══════════════════════════════════════════
 
 const PRIORITY = {
-  red:    { label: "Overdue",   desc: "Past deadline — needs immediate attention",     bg: "bg-red-50",     border: "border-red-200",    dot: "bg-red-500",     badge: "bg-red-100 text-red-700",         ring: "ring-red-300" },
-  yellow: { label: "At Risk",   desc: "Approaching deadline — plan action soon",       bg: "bg-amber-50",   border: "border-amber-200",  dot: "bg-amber-500",   badge: "bg-amber-100 text-amber-700",     ring: "ring-amber-300" },
-  green:  { label: "Due Soon",  desc: "Upcoming task — no immediate concern",          bg: "bg-emerald-50", border: "border-emerald-200", dot: "bg-emerald-500", badge: "bg-emerald-100 text-emerald-700", ring: "ring-emerald-300" },
-  blue:   { label: "Addressed", desc: "Completed or scheduled — cleared end of month", bg: "bg-sky-50",     border: "border-sky-200",    dot: "bg-sky-500",     badge: "bg-sky-100 text-sky-700",         ring: "ring-sky-300" },
+  red: { label: "Overdue", desc: "Past deadline — needs immediate attention", bg: "bg-red-50", border: "border-red-200", dot: "bg-red-500", badge: "bg-red-100 text-red-700", ring: "ring-red-300" },
+  yellow: { label: "At Risk", desc: "Approaching deadline — plan action soon", bg: "bg-amber-50", border: "border-amber-200", dot: "bg-amber-500", badge: "bg-amber-100 text-amber-700", ring: "ring-amber-300" },
+  green: { label: "Due Soon", desc: "Upcoming task — no immediate concern", bg: "bg-emerald-50", border: "border-emerald-200", dot: "bg-emerald-500", badge: "bg-emerald-100 text-emerald-700", ring: "ring-emerald-300" },
+  blue: { label: "Addressed", desc: "Completed or scheduled — cleared end of month", bg: "bg-sky-50", border: "border-sky-200", dot: "bg-sky-500", badge: "bg-sky-100 text-sky-700", ring: "ring-sky-300" },
 } as const;
 
 const PRIO_ORDER: (keyof typeof PRIORITY)[] = ["red", "yellow", "green", "blue"];
@@ -42,12 +42,12 @@ const UTIL_TYPE_OPTIONS = ["electric", "water", "gas", "waste", "internet", "pho
 const BAR_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 
 const TABS: { key: TabKey; label: string }[] = [
-  { key: "dashboard",  label: "Dashboard" },
-  { key: "utility",    label: "Utility Use" },
+  { key: "dashboard", label: "Dashboard" },
+  { key: "utility", label: "Utility Use" },
   { key: "valuations", label: "Building Valuations" },
-  { key: "risks",      label: "Active Risks" },
-  { key: "finances",   label: "Finances" },
-  { key: "history",    label: "History" },
+  { key: "risks", label: "Active Risks" },
+  { key: "finances", label: "Finances" },
+  { key: "history", label: "History" },
 ];
 
 // ══════════════════════════════════════════
@@ -428,6 +428,7 @@ export default function DashboardPage() {
       refreshData();
     } catch (err) { console.error(err); showToast("Failed to delete", "error"); }
   };
+  void deleteAppraisalDoc;
 
   const editAppraisal = async (appraisalId: number, updates: Record<string, any>) => {
     try {
@@ -581,6 +582,7 @@ export default function DashboardPage() {
 
   const todoBuildings = useMemo(() => [...new Set(todos.map((t) => t.building))].sort(), [todos]);
   const hasTemplate = templates.some((t: any) => t.is_default);
+  void hasTemplate;
 
   // ══════════════════════════════════════════
   // Render
@@ -608,9 +610,9 @@ export default function DashboardPage() {
             <h1 className="text-lg font-semibold text-stone-800" style={{ fontFamily: "'Fraunces', serif" }}>Dashboard</h1>
           </div>
           <div className="relative" ref={menuRef}>
-            <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex items-center gap-2 hover:bg-stone-50 rounded-lg px-2 py-1.5 transition-colors">
+            <button onClick={() => setUserMenuOpen(!userMenuOpen)} aria-label="User account menu" aria-expanded={userMenuOpen} className="flex items-center gap-2 hover:bg-stone-50 rounded-lg px-2 py-1.5 transition-colors">
               <div className="w-8 h-8 rounded-full bg-stone-200 flex items-center justify-center text-sm font-medium overflow-hidden">
-                {user?.picture ? <img src={user.picture} alt="" className="w-full h-full object-cover" /> : (user?.name?.[0] || "U").toUpperCase()}
+                {user?.picture ? <img src={user.picture} alt="User profile photo" className="w-full h-full object-cover" /> : (user?.name?.[0] || "U").toUpperCase()}
               </div>
               <svg className="w-4 h-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
@@ -633,30 +635,33 @@ export default function DashboardPage() {
             <div className="p-5 flex items-center gap-5">
               <label className="flex-shrink-0 cursor-pointer group relative">
                 <div className="w-20 h-20 rounded-xl bg-stone-100 overflow-hidden border-2 border-stone-200 flex items-center justify-center">
-                  {parishImage ? <img src={parishImage} alt="" className="w-full h-full object-cover" /> : <svg className="w-8 h-8 text-stone-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>}
+                  {parishImage ? <img src={parishImage} alt={`${parish?.name || "Parish"} photo`} className="w-full h-full object-cover" /> : <svg className="w-8 h-8 text-stone-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>}
                 </div>
                 <div className="absolute inset-0 rounded-xl bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                   <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 </div>
-                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                <input type="file" accept="image/*" className="hidden" aria-label="Upload parish image" onChange={handleImageUpload} />
               </label>
               <div className="flex-1 min-w-0">
                 {editingName ? (
                   <div className="flex items-center gap-2">
                     <input value={nameInput} onChange={(e) => setNameInput(e.target.value)} autoFocus onKeyDown={(e) => e.key === "Enter" && saveParishName()}
+                      aria-label="Edit parish name"
                       className="text-xl font-bold text-stone-800 border border-stone-300 rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-stone-400" style={{ fontFamily: "'Fraunces', serif" }} />
                     <button onClick={saveParishName} className="text-emerald-600 text-sm font-medium">Save</button>
-                    <button onClick={() => setEditingName(false)} className="text-stone-400 text-sm">Cancel</button>
+                    <button onClick={() => setEditingName(false)} className="text-stone-500 hover:text-stone-700 text-sm">Cancel</button>
                   </div>
                 ) : (
                   <h2 onClick={() => { setEditingName(true); setNameInput(parish?.name || ""); }} className="text-xl font-bold text-stone-800 truncate cursor-pointer hover:text-stone-600 transition-colors" style={{ fontFamily: "'Fraunces', serif" }} title="Click to rename">
                     {parish?.name || "Untitled Parish"}
                   </h2>
                 )}
-                <p className="text-sm text-stone-400 mt-0.5">{parish?.diocese}{parish?.address ? ` · ${parish.address}` : ""}</p>
+                <p className="text-sm text-stone-600 mt-0.5">{parish?.diocese}{parish?.address ? ` · ${parish.address}` : ""}</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-stone-400">{buildings.length} building{buildings.length !== 1 ? "s" : ""}</span>
+                  <span className="text-xs text-stone-600 font-medium">{buildings.length} building{buildings.length !== 1 ? "s" : ""}</span>
                   <button onClick={() => setShowBuildingMgmt(!showBuildingMgmt)}
+                    aria-expanded={showBuildingMgmt}
+                    aria-label="Manage buildings list"
                     className="text-xs text-blue-600 hover:text-blue-700 font-medium">
                     {showBuildingMgmt ? "Close ▴" : "Manage ▾"}
                   </button>
@@ -675,9 +680,11 @@ export default function DashboardPage() {
                   <h4 className="text-xs font-semibold text-stone-600">Buildings</h4>
                   <div className="flex items-center gap-2">
                     <input value={newBuildingName} onChange={(e) => setNewBuildingName(e.target.value)} placeholder="New building name"
+                      aria-label="New building name"
                       onKeyDown={(e) => e.key === "Enter" && addBuilding()}
                       className="border border-stone-300 rounded-lg px-2.5 py-1 text-xs w-40 focus:outline-none focus:ring-1 focus:ring-stone-400" />
                     <button onClick={addBuilding} disabled={!newBuildingName.trim()}
+                      aria-label="Add building to list"
                       className="bg-stone-800 hover:bg-stone-900 disabled:bg-stone-300 text-white px-2.5 py-1 rounded-lg text-xs font-medium">Add</button>
                   </div>
                 </div>
@@ -688,23 +695,24 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-2 flex-1">
                           <input value={renamingBuilding.name} onChange={(e) => setRenamingBuilding({ ...renamingBuilding, name: e.target.value })}
                             autoFocus onKeyDown={(e) => e.key === "Enter" && renameBuilding()}
+                            aria-label={`Rename building ${b.name}`}
                             className="flex-1 border border-stone-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-stone-400" />
                           <button onClick={renameBuilding} className="text-emerald-600 text-xs font-medium">Save</button>
-                          <button onClick={() => setRenamingBuilding(null)} className="text-stone-400 text-xs">Cancel</button>
+                          <button onClick={() => setRenamingBuilding(null)} className="text-stone-500 hover:text-stone-700 text-xs">Cancel</button>
                         </div>
                       ) : (
                         <>
                           <button onClick={() => setRenamingBuilding({ id: b.id, name: b.name })} className="text-sm text-stone-700 hover:text-blue-600 transition-colors" title="Click to rename">{b.name}</button>
                           {confirmDeleteBuilding === b.id ? (
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-red-600">Remove?</span>
-                              <button onClick={() => removeBuilding(b.id)} className="text-xs bg-red-600 text-white px-2 py-0.5 rounded font-medium">Yes</button>
-                              <button onClick={() => setConfirmDeleteBuilding(null)} className="text-xs text-stone-400">No</button>
+                              <span className="text-xs text-red-600 font-medium">Remove?</span>
+                              <button onClick={() => removeBuilding(b.id)} aria-label={`Confirm remove building ${b.name}`} className="text-xs bg-red-600 text-white px-2 py-0.5 rounded font-medium">Yes</button>
+                              <button onClick={() => setConfirmDeleteBuilding(null)} className="text-xs text-stone-500">No</button>
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <button onClick={() => setRenamingBuilding({ id: b.id, name: b.name })} className="text-xs text-stone-400 hover:text-stone-600">Rename</button>
-                              <button onClick={() => setConfirmDeleteBuilding(b.id)} className="text-xs text-stone-400 hover:text-red-500">Remove</button>
+                              <button onClick={() => setRenamingBuilding({ id: b.id, name: b.name })} aria-label={`Rename building ${b.name}`} className="text-xs text-stone-500 hover:text-stone-700">Rename</button>
+                              <button onClick={() => setConfirmDeleteBuilding(b.id)} aria-label={`Remove building ${b.name}`} className="text-xs text-stone-500 hover:text-red-600">Remove</button>
                             </div>
                           )}
                         </>
@@ -728,10 +736,10 @@ export default function DashboardPage() {
                     </button>
                   ))}
                 </div>
-                <label className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors bg-white border border-stone-300 text-stone-700 hover:bg-stone-50">
-                  + Add Files
+                <label className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 focus-within:ring-2 focus-within:ring-stone-400">
+                  Upload
                   <input ref={fileRef} type="file" accept=".pdf" multiple className="hidden" onChange={handleFilesSelected}
-                    disabled={uploading} />
+                    disabled={uploading} aria-label="Upload PDF files" />
                 </label>
                 {stagedFiles.length > 0 && !uploading && (
                   <button onClick={parseAndUpload} className="bg-stone-800 hover:bg-stone-900 text-white px-4 py-1.5 rounded-lg text-xs font-medium transition-colors">
@@ -772,16 +780,16 @@ export default function DashboardPage() {
             </div>
 
             {/* Tabs */}
-            <div className="border-t border-stone-100 px-5 flex gap-0 overflow-x-auto">
+            <nav role="tablist" aria-label="Dashboard views" className="border-t border-stone-100 px-5 flex gap-0 overflow-x-auto">
               {TABS.map((tab) => (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                    activeTab === tab.key ? "text-stone-800 border-stone-800" : "text-stone-500 border-transparent hover:text-stone-700 hover:border-stone-300"
-                  }`}>
+                <button key={tab.key} role="tab" aria-selected={activeTab === tab.key} id={`tab-${tab.key}`} aria-controls={`panel-${tab.key}`}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 ${activeTab === tab.key ? "text-stone-800 border-stone-800" : "text-stone-600 border-transparent hover:text-stone-800 hover:border-stone-300"
+                    }`}>
                   {tab.label}
                 </button>
               ))}
-            </div>
+            </nav>
           </div>
         </div>
 
@@ -820,11 +828,10 @@ export default function DashboardPage() {
 
       {/* Toast notification */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border text-sm font-medium transition-all ${
-          toast.type === "error" ? "bg-red-50 border-red-200 text-red-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"
-        }`}>
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border text-sm font-medium transition-all ${toast.type === "error" ? "bg-red-50 border-red-200 text-red-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"
+          }`}>
           <span>{toast.msg}</span>
-          <button onClick={() => setToast(null)} className="text-current opacity-50 hover:opacity-100">✕</button>
+          <button onClick={() => setToast(null)} aria-label="Close notification" className="text-current opacity-50 hover:opacity-100">✕</button>
         </div>
       )}
 
@@ -838,6 +845,7 @@ export default function DashboardPage() {
 // ══════════════════════════════════════════
 
 function DashboardTab({ utilities, todos, utilMonthly, allMonths, buildingVals, totalVal, totalValPct, prioCounts, estMonthly, recentHistoryByMonth, toggleTodo, setActiveTab, showAddTask, setShowAddTask, newTaskText, setNewTaskText, newTaskBuilding, setNewTaskBuilding, newTaskPriority, setNewTaskPriority, addTask, buildings }: any) {
+  void [buildingVals, totalVal, totalValPct];
   return (
     <div className="grid gap-4" style={{ gridTemplateColumns: "2fr 1fr" }}>
       <div className="space-y-4">
@@ -847,11 +855,11 @@ function DashboardTab({ utilities, todos, utilMonthly, allMonths, buildingVals, 
             <h3 onClick={() => setActiveTab("risks")} className="text-base font-semibold text-stone-800 cursor-pointer hover:text-blue-700 transition-colors" style={{ fontFamily: "'Fraunces', serif" }}>Active Risks & Backlog →</h3>
             <div className="flex items-center gap-1.5">
               {PRIO_ORDER.map((p) => (
-                <span key={p} title={PRIORITY[p].desc} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-help ${PRIORITY[p].badge}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY[p].dot}`} />{prioCounts[p]}
+                <span key={p} title={PRIORITY[p].desc} aria-label={`${PRIORITY[p].label}: ${prioCounts[p]} tasks`} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-help ${PRIORITY[p].badge}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY[p].dot}`} aria-hidden="true" />{prioCounts[p]}
                 </span>
               ))}
-              <button onClick={() => setShowAddTask(true)} className="ml-2 text-xs text-stone-500 hover:text-stone-800 font-medium">+ Add</button>
+              <button onClick={() => setShowAddTask(true)} aria-label="Add new task" className="ml-2 text-xs text-stone-600 hover:text-stone-900 font-medium">+ Add</button>
             </div>
           </div>
 
@@ -864,11 +872,13 @@ function DashboardTab({ utilities, todos, utilMonthly, allMonths, buildingVals, 
                 const c = PRIORITY[todo.priority as keyof typeof PRIORITY];
                 return (
                   <div key={todo.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${c.border} ${c.bg}`}>
-                    <button onClick={() => toggleTodo(todo.id)} className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${todo.done ? "bg-sky-500 border-sky-500 text-white" : "border-stone-300 hover:border-stone-400"}`}>
+                    <button onClick={() => toggleTodo(todo.id)}
+                      aria-label={todo.done ? `Mark "${todo.text}" incomplete` : `Mark "${todo.text}" addressed`}
+                      className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${todo.done ? "bg-sky-500 border-sky-500 text-white" : "border-stone-300 hover:border-stone-400"}`}>
                       {todo.done && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                     </button>
-                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${c.dot}`} />
-                    <span className={`flex-1 text-sm ${todo.done ? "line-through text-stone-400" : "text-stone-700"}`}>{todo.text}</span>
+                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${c.dot}`} aria-hidden="true" />
+                    <span className={`flex-1 text-sm ${todo.done ? "line-through text-stone-500" : "text-stone-700"}`}>{todo.text}</span>
                     <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${c.badge}`}>{todo.building}</span>
                   </div>
                 );
@@ -952,46 +962,49 @@ function RisksTab({ todos, toggleTodo, todoBuildings, showAddTask, setShowAddTas
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">{PRIO_ORDER.map((p) => (<span key={p} title={PRIORITY[p].desc} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium cursor-help ${PRIORITY[p].badge}`}><span className={`w-2 h-2 rounded-full ${PRIORITY[p].dot}`} />{prioCounts[p]} {PRIORITY[p].label}</span>))}</div>
-        <button onClick={() => setShowAddTask(true)} className="bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Add Task</button>
+        <div className="flex items-center gap-2">{PRIO_ORDER.map((p) => (<span key={p} title={PRIORITY[p].desc} aria-label={`${PRIORITY[p].label}: ${prioCounts[p]} tasks`} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium cursor-help ${PRIORITY[p].badge}`}><span className={`w-2 h-2 rounded-full ${PRIORITY[p].dot}`} aria-hidden="true" />{prioCounts[p]} {PRIORITY[p].label}</span>))}</div>
+        <button onClick={() => setShowAddTask(true)} aria-label="Add new task" className="bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Add Task</button>
       </div>
 
       {showAddTask && <div className="mb-4"><AddTaskForm {...{ newTaskText, setNewTaskText, newTaskBuilding, setNewTaskBuilding, newTaskPriority, setNewTaskPriority, addTask, buildings, onCancel: () => setShowAddTask(false) }} /></div>}
 
-      {todoBuildings.length === 0 && !showAddTask ? <div className="bg-white rounded-xl border border-stone-200 p-12 text-center"><p className="text-stone-400">No tasks yet.</p></div> : (
+      {todoBuildings.length === 0 && !showAddTask ? <div className="bg-white rounded-xl border border-stone-200 p-12 text-center"><p className="text-stone-500">No tasks yet.</p></div> : (
         <div className="space-y-4">{todoBuildings.map((building: string) => {
           const bTodos = todos.filter((t: any) => t.building === building).sort(sortByPriority);
           return (
             <div key={building} className="bg-white rounded-xl border border-stone-200 overflow-hidden">
               <div className="px-5 py-3 border-b border-stone-100 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-stone-700" style={{ fontFamily: "'Fraunces', serif" }}>{building}</h3>
-                <span className="text-xs text-stone-400">{bTodos.filter((t: any) => !t.done).length} active</span>
+                <span className="text-xs text-stone-500 font-medium">{bTodos.filter((t: any) => !t.done).length} active</span>
               </div>
               <div className="divide-y divide-stone-100">{bTodos.map((todo: any) => {
                 const c = PRIORITY[todo.priority as keyof typeof PRIORITY]; const isEditing = editingTaskId === todo.id;
                 return (
                   <div key={todo.id} className={`flex items-center gap-3 px-5 py-3 ${c.bg}`}>
-                    <button onClick={() => toggleTodo(todo.id)} className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center ${todo.done ? "bg-sky-500 border-sky-500 text-white" : "border-stone-300 hover:border-stone-400"}`}>{todo.done && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}</button>
-                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${c.dot}`} />
+                    <button onClick={() => toggleTodo(todo.id)}
+                      aria-label={todo.done ? `Mark "${todo.text}" incomplete` : `Mark "${todo.text}" addressed`}
+                      className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center ${todo.done ? "bg-sky-500 border-sky-500 text-white" : "border-stone-300 hover:border-stone-400"}`}>{todo.done && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}</button>
+                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${c.dot}`} aria-hidden="true" />
                     {isEditing ? (
                       <div className="flex-1 flex items-center gap-2 flex-wrap">
-                        <input value={editTaskText} onChange={(e: any) => setEditTaskText(e.target.value)} className="flex-1 min-w-[120px] border border-stone-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300" />
+                        <input value={editTaskText} onChange={(e: any) => setEditTaskText(e.target.value)} aria-label="Task description" className="flex-1 min-w-[120px] border border-stone-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300" />
                         {buildings && buildings.length > 0 && (
                           <select value={editTaskBuilding} onChange={(e: any) => setEditTaskBuilding(e.target.value)}
+                            aria-label="Assign to building"
                             className="border border-stone-300 rounded px-2 py-1 text-xs bg-white">
                             {buildings.map((b: any) => <option key={b.id} value={b.name}>{b.name}</option>)}
                           </select>
                         )}
-                        <div className="flex gap-1">{(["red", "yellow", "green"] as const).map((p) => (<button key={p} onClick={() => setEditTaskPriority(p)} className={`w-4 h-4 rounded-full ${PRIORITY[p].dot} ${editTaskPriority === p ? "ring-2 ring-offset-1 " + PRIORITY[p].ring : "opacity-40 hover:opacity-70"}`} />))}</div>
-                        <button onClick={() => saveEditTask(todo.id)} className="text-emerald-600 text-xs font-medium">Save</button>
-                        <button onClick={() => setEditingTaskId(null)} className="text-stone-400 text-xs">Cancel</button>
+                        <div className="flex gap-1">{(["red", "yellow", "green"] as const).map((p) => (<button key={p} onClick={() => setEditTaskPriority(p)} aria-label={`Set priority ${PRIORITY[p].label}`} className={`w-4 h-4 rounded-full ${PRIORITY[p].dot} ${editTaskPriority === p ? "ring-2 ring-offset-1 " + PRIORITY[p].ring : "opacity-40 hover:opacity-70"}`} />))}</div>
+                        <button onClick={() => saveEditTask(todo.id)} aria-label="Save task changes" className="text-emerald-600 text-xs font-medium">Save</button>
+                        <button onClick={() => setEditingTaskId(null)} aria-label="Cancel editing task" className="text-stone-500 hover:text-stone-700 text-xs">Cancel</button>
                       </div>
                     ) : (
                       <>
-                        <span className={`flex-1 text-sm ${todo.done ? "line-through text-stone-400" : "text-stone-700"}`}>{todo.text}</span>
+                        <span className={`flex-1 text-sm ${todo.done ? "line-through text-stone-500" : "text-stone-700"}`}>{todo.text}</span>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.badge}`}>{c.label}</span>
-                        <button onClick={() => startEditTask(todo)} className="text-stone-400 hover:text-stone-600 text-xs ml-1">Edit</button>
-                        <button onClick={() => deleteTask(todo.id)} className="text-stone-400 hover:text-red-500 text-xs">✕</button>
+                        <button onClick={() => startEditTask(todo)} aria-label={`Edit task "${todo.text}"`} className="text-stone-500 hover:text-stone-700 text-xs ml-1">Edit</button>
+                        <button onClick={() => deleteTask(todo.id)} aria-label={`Delete task "${todo.text}"`} className="text-stone-400 hover:text-red-500 text-xs">✕</button>
                       </>
                     )}
                   </div>
@@ -1103,124 +1116,124 @@ function UtilityTab({ utilities, utilBuildings, utilBuildingData, allMonths, bui
         </button>
 
         {acctPanelOpen && (
-        <div className="px-5 pb-5 space-y-3">
+          <div className="px-5 pb-5 space-y-3">
 
-        {/* Unassigned accounts */}
-        {unassignedAccounts.length > 0 && (
-          <div className="bg-white rounded-lg border border-amber-200 p-3">
-            <p className="text-xs text-amber-700 mb-2 font-medium">Unassigned accounts — assign to a building or General Expenses:</p>
-            {unassignedAccounts.map((ua) => (
-              <div key={ua.account_number} className="flex items-center gap-2 py-1.5 text-sm">
-                <span className="text-stone-600 font-mono text-xs bg-stone-100 px-2 py-0.5 rounded">{ua.account_number}</span>
-                <span className="text-xs text-stone-400 capitalize">{ua.utility_type}</span>
-                <span className="text-xs text-stone-400">({ua.count} bills)</span>
-                <span className="text-xs text-stone-400 mx-1">→</span>
-                <select onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === "__general__") assignToGeneral(ua.account_number);
-                  else if (val) saveAccountNumber(Number(val), ua.utility_type, ua.account_number);
-                  e.target.value = "";
-                }} className="border border-amber-300 rounded px-2 py-1 text-xs bg-white" defaultValue="">
-                  <option value="">Assign to…</option>
-                  <option value="__general__">General Expenses</option>
-                  {buildings.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
+            {/* Unassigned accounts */}
+            {unassignedAccounts.length > 0 && (
+              <div className="bg-white rounded-lg border border-amber-200 p-3">
+                <p className="text-xs text-amber-700 mb-2 font-medium">Unassigned accounts — assign to a building or General Expenses:</p>
+                {unassignedAccounts.map((ua) => (
+                  <div key={ua.account_number} className="flex items-center gap-2 py-1.5 text-sm">
+                    <span className="text-stone-600 font-mono text-xs bg-stone-100 px-2 py-0.5 rounded">{ua.account_number}</span>
+                    <span className="text-xs text-stone-400 capitalize">{ua.utility_type}</span>
+                    <span className="text-xs text-stone-400">({ua.count} bills)</span>
+                    <span className="text-xs text-stone-400 mx-1">→</span>
+                    <select onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "__general__") assignToGeneral(ua.account_number);
+                      else if (val) saveAccountNumber(Number(val), ua.utility_type, ua.account_number);
+                      e.target.value = "";
+                    }} className="border border-amber-300 rounded px-2 py-1 text-xs bg-white" defaultValue="">
+                      <option value="">Assign to…</option>
+                      <option value="__general__">General Expenses</option>
+                      {buildings.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        {/* Building cards */}
-        {buildings.map((b: any) => {
-          const assignedUtils = Object.keys(b.account_numbers || {}).filter((k: string) => b.account_numbers[k]);
-          return (
-            <div key={b.id} className="bg-white rounded-lg border border-stone-200 px-4 py-3">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-stone-700">{b.name}</p>
-                <select onChange={(e) => {
-                  if (e.target.value) { setEditingAcct({ buildingId: b.id, utilType: e.target.value, value: "" }); e.target.value = ""; }
-                }} className="border border-stone-300 rounded px-2 py-0.5 text-xs bg-white" defaultValue="">
-                  <option value="">+ Add utility</option>
-                  {UTIL_TYPE_OPTIONS.filter((ut) => !assignedUtils.includes(ut)).map((ut) => (
-                    <option key={ut} value={ut}>{ut}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {assignedUtils.map((ut: string) => {
-                  const acct = b.account_numbers?.[ut];
-                  const isEditing = editingAcct?.buildingId === b.id && editingAcct?.utilType === ut;
-                  return (
-                    <div key={ut} className="flex items-center gap-1 text-xs bg-stone-50 rounded-lg px-2 py-1">
-                      <span className="text-stone-500 capitalize font-medium">{ut}:</span>
-                      {isEditing ? (
-                        <div className="flex items-center gap-1">
-                          <input value={editingAcct.value} onChange={(e) => setEditingAcct({ ...editingAcct, value: e.target.value })}
-                            className="border border-stone-300 rounded px-1.5 py-0.5 text-xs w-24 font-mono" autoFocus
-                            onKeyDown={(e) => { if (e.key === "Enter") saveAccountNumber(b.id, ut, editingAcct.value); if (e.key === "Escape") setEditingAcct(null); }} />
-                          <button onClick={() => saveAccountNumber(b.id, ut, editingAcct.value)} className="text-emerald-600 text-xs">✓</button>
-                          <button onClick={() => setEditingAcct(null)} className="text-stone-400 text-xs">✕</button>
+            {/* Building cards */}
+            {buildings.map((b: any) => {
+              const assignedUtils = Object.keys(b.account_numbers || {}).filter((k: string) => b.account_numbers[k]);
+              return (
+                <div key={b.id} className="bg-white rounded-lg border border-stone-200 px-4 py-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-stone-700">{b.name}</p>
+                    <select onChange={(e) => {
+                      if (e.target.value) { setEditingAcct({ buildingId: b.id, utilType: e.target.value, value: "" }); e.target.value = ""; }
+                    }} className="border border-stone-300 rounded px-2 py-0.5 text-xs bg-white" defaultValue="">
+                      <option value="">+ Add utility</option>
+                      {UTIL_TYPE_OPTIONS.filter((ut) => !assignedUtils.includes(ut)).map((ut) => (
+                        <option key={ut} value={ut}>{ut}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {assignedUtils.map((ut: string) => {
+                      const acct = b.account_numbers?.[ut];
+                      const isEditing = editingAcct?.buildingId === b.id && editingAcct?.utilType === ut;
+                      return (
+                        <div key={ut} className="flex items-center gap-1 text-xs bg-stone-50 rounded-lg px-2 py-1">
+                          <span className="text-stone-500 capitalize font-medium">{ut}:</span>
+                          {isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <input value={editingAcct.value} onChange={(e) => setEditingAcct({ ...editingAcct, value: e.target.value })}
+                                className="border border-stone-300 rounded px-1.5 py-0.5 text-xs w-24 font-mono" autoFocus
+                                onKeyDown={(e) => { if (e.key === "Enter") saveAccountNumber(b.id, ut, editingAcct.value); if (e.key === "Escape") setEditingAcct(null); }} />
+                              <button onClick={() => saveAccountNumber(b.id, ut, editingAcct.value)} className="text-emerald-600 text-xs">✓</button>
+                              <button onClick={() => setEditingAcct(null)} className="text-stone-400 text-xs">✕</button>
+                            </div>
+                          ) : (
+                            <>
+                              <button onClick={() => setEditingAcct({ buildingId: b.id, utilType: ut, value: acct || "" })}
+                                className="font-mono px-1 rounded bg-white border border-stone-200 text-stone-600 hover:border-stone-400">
+                                {acct || "set #"}
+                              </button>
+                              <button onClick={() => removeUtilFromBuilding(b.id, ut)}
+                                className="text-stone-300 hover:text-red-500 ml-0.5" title="Remove utility">✕</button>
+                            </>
+                          )}
                         </div>
-                      ) : (
-                        <>
-                          <button onClick={() => setEditingAcct({ buildingId: b.id, utilType: ut, value: acct || "" })}
-                            className="font-mono px-1 rounded bg-white border border-stone-200 text-stone-600 hover:border-stone-400">
-                            {acct || "set #"}
-                          </button>
-                          <button onClick={() => removeUtilFromBuilding(b.id, ut)}
-                            className="text-stone-300 hover:text-red-500 ml-0.5" title="Remove utility">✕</button>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-                {editingAcct && editingAcct.buildingId === b.id && !assignedUtils.includes(editingAcct.utilType) && (
-                  <div className="flex items-center gap-1 text-xs bg-blue-50 rounded-lg px-2 py-1">
-                    <span className="text-blue-600 capitalize font-medium">{editingAcct.utilType}:</span>
-                    <input value={editingAcct.value} onChange={(e) => setEditingAcct({ ...editingAcct, value: e.target.value })}
-                      placeholder="Account #" className="border border-blue-300 rounded px-1.5 py-0.5 text-xs w-24 font-mono" autoFocus
-                      onKeyDown={(e) => { if (e.key === "Enter") saveAccountNumber(b.id, editingAcct.utilType, editingAcct.value); if (e.key === "Escape") setEditingAcct(null); }} />
-                    <button onClick={() => saveAccountNumber(b.id, editingAcct.utilType, editingAcct.value)} className="text-emerald-600 text-xs">✓</button>
-                    <button onClick={() => setEditingAcct(null)} className="text-stone-400 text-xs">✕</button>
+                      );
+                    })}
+                    {editingAcct && editingAcct.buildingId === b.id && !assignedUtils.includes(editingAcct.utilType) && (
+                      <div className="flex items-center gap-1 text-xs bg-blue-50 rounded-lg px-2 py-1">
+                        <span className="text-blue-600 capitalize font-medium">{editingAcct.utilType}:</span>
+                        <input value={editingAcct.value} onChange={(e) => setEditingAcct({ ...editingAcct, value: e.target.value })}
+                          placeholder="Account #" className="border border-blue-300 rounded px-1.5 py-0.5 text-xs w-24 font-mono" autoFocus
+                          onKeyDown={(e) => { if (e.key === "Enter") saveAccountNumber(b.id, editingAcct.utilType, editingAcct.value); if (e.key === "Escape") setEditingAcct(null); }} />
+                        <button onClick={() => saveAccountNumber(b.id, editingAcct.utilType, editingAcct.value)} className="text-emerald-600 text-xs">✓</button>
+                        <button onClick={() => setEditingAcct(null)} className="text-stone-400 text-xs">✕</button>
+                      </div>
+                    )}
+                    {assignedUtils.length === 0 && !(editingAcct?.buildingId === b.id) && (
+                      <span className="text-xs text-stone-400">No utilities assigned — use dropdown above to add</span>
+                    )}
                   </div>
-                )}
-                {assignedUtils.length === 0 && !(editingAcct?.buildingId === b.id) && (
-                  <span className="text-xs text-stone-400">No utilities assigned — use dropdown above to add</span>
-                )}
-              </div>
-            </div>
-          );
-        })}
+                </div>
+              );
+            })}
 
-        {/* General Expenses card — editable like buildings */}
-        <div className="bg-white rounded-lg border border-amber-300 px-4 py-3">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium text-amber-800">General Expenses</p>
-              <span className="text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full">Non-building</span>
+            {/* General Expenses card — editable like buildings */}
+            <div className="bg-white rounded-lg border border-amber-300 px-4 py-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-amber-800">General Expenses</p>
+                  <span className="text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full">Non-building</span>
+                </div>
+              </div>
+              {genBills.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {genTypes.map((t: string) => {
+                    const typeBills = genBills.filter((u: any) => u.utility_type === t);
+                    const accts = Array.from(new Set<string>(typeBills.map((u: any) => u.account_number || "—").filter(Boolean)));
+                    return (
+                      <div key={t} className="flex items-center gap-1 text-xs bg-amber-50 rounded-lg px-2 py-1">
+                        <span className="text-amber-700 capitalize font-medium">{t}:</span>
+                        <span className="font-mono text-amber-600">{accts.join(", ") || "—"}</span>
+                        <span className="text-amber-400">({typeBills.length})</span>
+                        <button onClick={() => unassignFromGeneral(t)}
+                          className="text-amber-300 hover:text-red-500 ml-0.5" title="Remove from General Expenses">✕</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-stone-400">No bills assigned yet. Use the dropdown on unassigned accounts to assign bills here.</p>
+              )}
             </div>
           </div>
-          {genBills.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {genTypes.map((t: string) => {
-                const typeBills = genBills.filter((u: any) => u.utility_type === t);
-                const accts = Array.from(new Set<string>(typeBills.map((u: any) => u.account_number || "—").filter(Boolean)));
-                return (
-                  <div key={t} className="flex items-center gap-1 text-xs bg-amber-50 rounded-lg px-2 py-1">
-                    <span className="text-amber-700 capitalize font-medium">{t}:</span>
-                    <span className="font-mono text-amber-600">{accts.join(", ") || "—"}</span>
-                    <span className="text-amber-400">({typeBills.length})</span>
-                    <button onClick={() => unassignFromGeneral(t)}
-                      className="text-amber-300 hover:text-red-500 ml-0.5" title="Remove from General Expenses">✕</button>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-xs text-stone-400">No bills assigned yet. Use the dropdown on unassigned accounts to assign bills here.</p>
-          )}
-        </div>
-        </div>
         )}
       </div>
 
@@ -1441,9 +1454,8 @@ function ValuationsTab({ buildingVals, totalVal, totalValPct, appraisals, buildi
               {/* History toggle */}
               {history.length > 0 && (
                 <button onClick={() => setExpandedBuilding(isExpanded ? null : bv.name)}
-                  className={`w-full px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                    isExpanded ? "bg-stone-800 text-white" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                  }`}>
+                  className={`w-full px-3 py-2 rounded-lg text-xs font-medium transition-colors ${isExpanded ? "bg-stone-800 text-white" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                    }`}>
                   {isExpanded ? "Hide valuation history ▴" : `View ${history.length} valuation${history.length !== 1 ? "s" : ""} ▾`}
                 </button>
               )}
@@ -1466,33 +1478,35 @@ function ValuationsTab({ buildingVals, totalVal, totalValPct, appraisals, buildi
                       }
                     };
                     return (
-                    <div key={`${h.id}-${idx}`} className={`px-5 py-2.5 grid grid-cols-5 gap-2 items-center text-xs ${idx === 0 ? "bg-blue-50/50" : ""}`}>
-                      <span className="text-stone-700 font-medium">{h.date ? fmtDate(h.date) : "—"}{idx === 0 && <span className="ml-1 text-blue-600 text-[10px]">Latest</span>}</span>
-                      {isEditingThis("building_value") ? (
-                        <div className="flex items-center gap-1">
-                          <input value={editingVal!.value} onChange={(e) => setEditingVal({ ...editingVal!, value: e.target.value })}
-                            autoFocus onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditingVal(null); }}
-                            className="border border-stone-300 rounded px-1.5 py-0.5 text-xs w-full font-mono" />
-                          <button onClick={saveEdit} className="text-emerald-600 text-xs">✓</button>
-                        </div>
-                      ) : (
-                        <span onClick={() => startEdit("building_value", String(h.value || ""))}
-                          className="text-stone-700 tabular-nums font-medium cursor-pointer hover:text-blue-600 hover:underline">{money(h.value)}</span>
-                      )}
-                      {isEditingThis("gross_sq_ft") ? (
-                        <div className="flex items-center gap-1">
-                          <input value={editingVal!.value} onChange={(e) => setEditingVal({ ...editingVal!, value: e.target.value })}
-                            autoFocus onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditingVal(null); }}
-                            className="border border-stone-300 rounded px-1.5 py-0.5 text-xs w-full font-mono" />
-                          <button onClick={saveEdit} className="text-emerald-600 text-xs">✓</button>
-                        </div>
-                      ) : (
-                        <span onClick={() => startEdit("gross_sq_ft", String(h.sqft || ""))}
-                          className="text-stone-500 tabular-nums cursor-pointer hover:text-blue-600 hover:underline">{h.sqft > 0 ? h.sqft.toLocaleString() : "—"}</span>
-                      )}
-                      <span className="text-stone-500 tabular-nums">{h.perSqft > 0 ? money(h.perSqft) : "—"}</span>
-                      <span className="text-stone-400 truncate" title={h.filename}>{h.filename}</span>
-                    </div>
+                      <div key={`${h.id}-${idx}`} className={`px-5 py-2.5 grid grid-cols-5 gap-2 items-center text-xs ${idx === 0 ? "bg-blue-50/50" : ""}`}>
+                        <span className="text-stone-700 font-medium">{h.date ? fmtDate(h.date) : "—"}{idx === 0 && <span className="ml-1 text-blue-600 text-[10px]">Latest</span>}</span>
+                        {isEditingThis("building_value") ? (
+                          <div className="flex items-center gap-1">
+                            <input value={editingVal!.value} onChange={(e) => setEditingVal({ ...editingVal!, value: e.target.value })}
+                              aria-label="Building value"
+                              autoFocus onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditingVal(null); }}
+                              className="border border-stone-300 rounded px-1.5 py-0.5 text-xs w-full font-mono" />
+                            <button onClick={saveEdit} aria-label="Save building value" className="text-emerald-600 text-xs">✓</button>
+                          </div>
+                        ) : (
+                          <span onClick={() => startEdit("building_value", String(h.value || ""))}
+                            className="text-stone-700 tabular-nums font-medium cursor-pointer hover:text-blue-600 hover:underline">{money(h.value)}</span>
+                        )}
+                        {isEditingThis("gross_sq_ft") ? (
+                          <div className="flex items-center gap-1">
+                            <input value={editingVal!.value} onChange={(e) => setEditingVal({ ...editingVal!, value: e.target.value })}
+                              aria-label="Gross square feet"
+                              autoFocus onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditingVal(null); }}
+                              className="border border-stone-300 rounded px-1.5 py-0.5 text-xs w-full font-mono" />
+                            <button onClick={saveEdit} aria-label="Save gross square feet" className="text-emerald-600 text-xs">✓</button>
+                          </div>
+                        ) : (
+                          <span onClick={() => startEdit("gross_sq_ft", String(h.sqft || ""))}
+                            className="text-stone-500 tabular-nums cursor-pointer hover:text-blue-600 hover:underline">{h.sqft > 0 ? h.sqft.toLocaleString() : "—"}</span>
+                        )}
+                        <span className="text-stone-500 tabular-nums">{h.perSqft > 0 ? money(h.perSqft) : "—"}</span>
+                        <span className="text-stone-400 truncate" title={h.filename}>{h.filename}</span>
+                      </div>
                     );
                   })}
                 </div>
@@ -1553,6 +1567,7 @@ function FinancesTab({ utilities, estMonthly, bldgFinances, todos }: any) {
 const HTYPE = { upload: { label: "Upload", dot: "bg-blue-400", badge: "bg-blue-50 text-blue-700" }, task_added: { label: "Added", dot: "bg-stone-400", badge: "bg-stone-100 text-stone-600" }, task_changed: { label: "Changed", dot: "bg-amber-400", badge: "bg-amber-50 text-amber-700" }, task_addressed: { label: "Addressed", dot: "bg-emerald-400", badge: "bg-emerald-50 text-emerald-700" } };
 
 function HistoryTab({ historyByMonth, historyFilter, setHistoryFilter, history, uploadedDocs, removeUploadedDoc, showToast, utilities, appraisals, editUtilityBill, deleteUtilityBill, editAppraisal, refreshData, parishId, getAccessTokenSilently }: any) {
+  void [refreshData, parishId, getAccessTokenSilently];
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [expandedEntry, setExpandedEntry] = useState<number | null>(null);
   const [editingField, setEditingField] = useState<{ billId: number; field: string; value: string } | null>(null);
@@ -1622,7 +1637,7 @@ function HistoryTab({ historyByMonth, historyFilter, setHistoryFilter, history, 
                             <span className="text-xs text-red-600">Delete all data from this file?</span>
                             <button onClick={async () => {
                               await removeUploadedDoc(filename);
-                              try { await api.post(`/data/history/${e.id}/mark-removed`); } catch {}
+                              try { await api.post(`/data/history/${e.id}/mark-removed`); } catch { }
                               setConfirmRemove(null);
                               setExpandedEntry(null);
                               showToast?.("Document data removed");
@@ -1744,34 +1759,35 @@ function AddTaskForm({ newTaskText, setNewTaskText, newTaskBuilding, setNewTaskB
   return (
     <div className="bg-white rounded-xl border border-stone-200 p-4 mb-3">
       <div className="grid grid-cols-2 gap-3 mb-3">
-        <input value={newTaskText} onChange={(e: any) => setNewTaskText(e.target.value)} placeholder="Task description" className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300" />
+        <input value={newTaskText} onChange={(e: any) => setNewTaskText(e.target.value)} placeholder="Task description" aria-label="Task description" className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-400" />
         {buildings && buildings.length > 0 ? (
           <select value={newTaskBuilding} onChange={(e: any) => setNewTaskBuilding(e.target.value)}
-            className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300 bg-white">
+            aria-label="Select building"
+            className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-400 bg-white">
             <option value="">Select building</option>
             {buildings.map((b: any) => <option key={b.id} value={b.name}>{b.name}</option>)}
           </select>
         ) : (
-          <input value={newTaskBuilding} onChange={(e: any) => setNewTaskBuilding(e.target.value)} placeholder="Building name" className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300" />
+          <input value={newTaskBuilding} onChange={(e: any) => setNewTaskBuilding(e.target.value)} placeholder="Building name" aria-label="Building name" className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-400" />
         )}
       </div>
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs text-stone-500">Priority:</span>
+        <span className="text-xs text-stone-600 font-medium">Priority:</span>
         {(["red", "yellow", "green"] as const).map((p) => (
-          <button key={p} onClick={() => setNewTaskPriority(p)} title={PRIORITY[p].desc}
-            className={`px-3 py-1 rounded-full text-xs font-medium ${newTaskPriority === p ? `${PRIORITY[p].badge} ring-2 ${PRIORITY[p].ring}` : "bg-stone-100 text-stone-500 hover:bg-stone-200"}`}>{PRIORITY[p].label}</button>
+          <button key={p} onClick={() => setNewTaskPriority(p)} title={PRIORITY[p].desc} aria-label={`Set priority ${PRIORITY[p].label}`}
+            className={`px-3 py-1 rounded-full text-xs font-medium ${newTaskPriority === p ? `${PRIORITY[p].badge} ring-2 ${PRIORITY[p].ring}` : "bg-stone-100 text-stone-600 hover:bg-stone-200"}`}>{PRIORITY[p].label}</button>
         ))}
       </div>
       <div className="flex gap-2">
-        <button onClick={addTask} disabled={!newTaskText.trim() || !newTaskBuilding.trim()} className="bg-stone-800 hover:bg-stone-900 disabled:bg-stone-300 text-white px-4 py-2 rounded-lg text-sm font-medium">Add</button>
-        <button onClick={onCancel} className="text-stone-500 hover:text-stone-700 px-4 py-2 text-sm">Cancel</button>
+        <button onClick={addTask} disabled={!newTaskText.trim() || !newTaskBuilding.trim()} aria-label="Confirm add task" className="bg-stone-800 hover:bg-stone-900 disabled:bg-stone-300 text-white px-4 py-2 rounded-lg text-sm font-medium">Add</button>
+        <button onClick={onCancel} aria-label="Cancel task addition" className="text-stone-600 hover:text-stone-800 px-4 py-2 text-sm font-medium">Cancel</button>
       </div>
     </div>
   );
 }
 
 function Empty({ text, sub }: { text: string; sub?: string }) {
-  return <div className="text-center py-6"><p className="text-sm text-stone-400">{text}</p>{sub && <p className="text-xs text-stone-300 mt-1">{sub}</p>}</div>;
+  return <div className="text-center py-6"><p className="text-sm text-stone-500 font-medium">{text}</p>{sub && <p className="text-xs text-stone-400 mt-1">{sub}</p>}</div>;
 }
 
 function EditableCell({ value, rawValue, field, billId, type, editingBill, setEditingBill, editUtilityBill }: {
@@ -1786,6 +1802,7 @@ function EditableCell({ value, rawValue, field, billId, type, editingBill, setEd
       return (
         <div className="flex items-center gap-1">
           <select value={editingBill.value} onChange={(e) => { editUtilityBill(billId, { [field]: e.target.value }); setEditingBill(null); }}
+            aria-label={`Select ${field}`}
             autoFocus className="border border-stone-300 rounded px-1 py-0.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-stone-400">
             {UTIL_TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
           </select>
@@ -1796,9 +1813,11 @@ function EditableCell({ value, rawValue, field, billId, type, editingBill, setEd
       <div className="flex items-center gap-1">
         <input value={editingBill.value} onChange={(e) => setEditingBill({ ...editingBill, value: e.target.value })}
           type={type === "date" ? "date" : "text"} autoFocus
+          aria-label={`Edit ${field}`}
           onKeyDown={(e) => { if (e.key === "Enter") { editUtilityBill(billId, { [field]: editingBill.value }); setEditingBill(null); } if (e.key === "Escape") setEditingBill(null); }}
           className="border border-stone-300 rounded px-1.5 py-0.5 text-xs w-full focus:outline-none focus:ring-1 focus:ring-stone-400 font-mono" />
         <button onClick={() => { editUtilityBill(billId, { [field]: editingBill.value }); setEditingBill(null); }}
+          aria-label={`Save ${field}`}
           className="text-emerald-600 text-xs flex-shrink-0">✓</button>
       </div>
     );
