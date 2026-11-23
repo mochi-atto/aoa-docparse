@@ -231,7 +231,6 @@ export function UtilityTab({ canEdit, utilities, utilBuildings, utilBuildingData
           const md = utilBuildingData[building]?.[type] || {};
           return Object.values(md).some((v) => v > 0);
         });
-        if (typesToShow.length === 0 && !isExpanded) return null;
 
         return (
           <div key={building} className="bg-white rounded-xl border border-stone-200 overflow-hidden">

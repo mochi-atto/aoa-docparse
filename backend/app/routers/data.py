@@ -48,10 +48,6 @@ def get_utility_data(
     membership=Depends(parish_access),
 ):
     query = db.query(UtilityBill).filter(UtilityBill.parish_id == parish_id)
-    if utility_type:
-        query = query.filter(UtilityBill.utility_type == utility_type)
-    if building_name:
-        query = query.filter(UtilityBill.building_name == building_name)
     records = query.order_by(UtilityBill.bill_date.asc()).all()
 
     acct_map = _build_account_map(parish_id, db)
@@ -63,6 +59,10 @@ def get_utility_data(
             resolved_building = acct_map.get(str(r.account_number).strip())
         if not resolved_building:
             resolved_building = r.service_address
+        if utility_type and _normalize_util_type(r.utility_type) != _normalize_util_type(utility_type):
+            continue
+        if building_name and resolved_building != building_name:
+            continue
 
         results.append(UtilityChartPoint(
             id=r.id,
