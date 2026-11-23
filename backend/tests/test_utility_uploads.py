@@ -99,3 +99,7 @@ class UtilityUploadTests(unittest.TestCase):
             with bootstrap.begin() as connection:
                 connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
             bootstrap.dispose()
+
+    def test_missing_charges_do_not_become_a_zero_bill(self):
+        with patch('app.parsers.utility_parser._send_to_llm', return_value=[{'bill_date': '2026-01-01'}]):
+            self.assertEqual(parse_utility_bill('unused', extracted_text='Synthetic statement without charges'), [])

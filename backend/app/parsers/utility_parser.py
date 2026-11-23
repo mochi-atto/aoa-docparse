@@ -170,9 +170,9 @@ def _clean_bill(bill: dict) -> dict:
 
     # Ensure total_amount is a float
     try:
-        bill["total_amount"] = float(bill.get("total_amount", 0))
+        bill["total_amount"] = float(bill.get("total_amount"))
     except (TypeError, ValueError):
-        bill["total_amount"] = 0.0
+        bill["total_amount"] = None
 
     # Ensure numeric fields
     for field in ["usage_quantity", "rate"]:
