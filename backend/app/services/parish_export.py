@@ -179,13 +179,12 @@ def _utilities_sheet(wb, bills, index, account_map):
     if unitless or not usage_headers:
         usage_headers.append("Usage (unit not recorded)")
 
-    # TODO(AOA-39): add a "Notes" column once utility bill notes exist on UtilityBill (not on any branch yet).
     columns = [
         ("Bill ID", "int"), ("Building", "text"), ("Building ID", "int"), ("Utility type", "text"),
         ("Provider", "text"), ("Service address", "text"), ("Account #", "text"),
         ("Bill date", "date"), ("Due date", "date"), ("Billing period start", "date"), ("Billing period end", "date"),
         ("Total cost", "currency"), *[(h, "number") for h in usage_headers], ("Rate (per unit)", "rate"),
-        ("Source file", "text"), ("Created (UTC)", "datetime"),
+        ("Notes", "text"), ("Source file", "text"), ("Created (UTC)", "datetime"),
     ]
     rows = []
     for bill in bills:
@@ -204,7 +203,7 @@ def _utilities_sheet(wb, bills, index, account_map):
             bill.id, building, index.id_for(building), _normalize_util_type(bill.utility_type),
             bill.provider_name, bill.service_address, bill.account_number,
             bill.bill_date, bill.due_date, bill.billing_period_start, bill.billing_period_end,
-            bill.total_amount, *usage, bill.rate, bill.original_filename, bill.uploaded_at,
+            bill.total_amount, *usage, bill.rate, bill.usage_note, bill.original_filename, bill.uploaded_at,
         ])
     _write_sheet(wb, "Utilities", columns, rows)
 

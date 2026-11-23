@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import date, datetime
 
@@ -61,6 +61,13 @@ class UtilityChartPoint(BaseModel):
     original_filename: Optional[str] = None
     usage_quantity: Optional[float] = None
     usage_unit: Optional[str] = None
+    billing_period_start: Optional[date] = None
+    billing_period_end: Optional[date] = None
+    usage_note: Optional[str] = None
+    energy_per_sq_ft: Optional[float] = None
+    energy_unit: str = "kBtu/ft²"
+    valuation_sq_ft: Optional[float] = None
+    valuation_date: Optional[str] = None
 
 class AppraisalChartPoint(BaseModel):
     id: Optional[int] = None
@@ -76,3 +83,18 @@ class AppraisalChartPoint(BaseModel):
     property_address: Optional[str] = None
     appraiser_firm: Optional[str] = None
     expiration_date: Optional[str] = None
+
+class ManualUtilityBill(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    parish_id: int
+    building_name: str | None = None
+    provider_name: str | None = None
+    account_number: str | None = None
+    utility_type: str
+    bill_date: date
+    total_amount: float
+    billing_period_start: date | None = None
+    billing_period_end: date | None = None
+    usage_quantity: float | None = Field(None, ge=0)
+    usage_unit: str | None = None
+    usage_note: str | None = Field(None, max_length=2000)

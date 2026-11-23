@@ -1,3 +1,5 @@
+import { UtilityBillDetails } from "./UtilityBillDetails";
+import { ManualUtilityEntry } from "./ManualUtilityEntry";
 import type { DashboardViewProps } from "./viewTypes";
 import { useState, useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -78,7 +80,7 @@ export function UtilityTab({ canEdit, utilities, utilBuildings, utilBuildingData
     } catch (err) { console.error(err); showToast("Failed to remove", "error"); }
   };
 
-  if (utilities.length === 0 && buildings.length === 0) {
+  if (!canEdit && utilities.length === 0 && buildings.length === 0) {
     return <div className="bg-white rounded-xl border border-stone-200 p-12 text-center"><p className="text-stone-400 text-sm">Upload utility bills to see detailed breakdowns.</p></div>;
   }
 
@@ -87,6 +89,7 @@ export function UtilityTab({ canEdit, utilities, utilBuildings, utilBuildingData
 
   return (
     <div className="space-y-6">
+      {canEdit && <ManualUtilityEntry parishId={parishId} buildings={buildings} refreshData={refreshData} />}
       {/* ═══ Amber panel: account management ═══ */}
       <div className="bg-amber-50 rounded-xl border border-amber-200 overflow-hidden">
         <button onClick={() => setAcctPanelOpen(!acctPanelOpen)}
@@ -231,7 +234,6 @@ export function UtilityTab({ canEdit, utilities, utilBuildings, utilBuildingData
           const md = utilBuildingData[building]?.[type] || {};
           return Object.values(md).some((v) => v > 0);
         });
-        if (typesToShow.length === 0 && !isExpanded) return null;
 
         return (
           <div key={building} className="bg-white rounded-xl border border-stone-200 overflow-hidden">
@@ -287,7 +289,7 @@ export function UtilityTab({ canEdit, utilities, utilBuildings, utilBuildingData
                 </div>
                 <div className="divide-y divide-stone-50">
                   {billsForBuilding.sort((a, b) => new Date(b.bill_date).getTime() - new Date(a.bill_date).getTime()).map((bill) => (
-                    <div key={bill.id} className="px-6 py-2 grid grid-cols-7 gap-2 items-center text-xs hover:bg-stone-50 group">
+                    <div key={bill.id}><div className="px-6 py-2 grid grid-cols-7 gap-2 items-center text-xs hover:bg-stone-50 group">
                       <EditableCell canEdit={canEdit} value={bill.bill_date} field="bill_date" billId={bill.id} type="date"
                         editingBill={editingBill} setEditingBill={setEditingBill} editUtilityBill={editUtilityBill} />
                       <EditableCell canEdit={canEdit} value={bill.utility_type} field="utility_type" billId={bill.id} type="select"
@@ -296,11 +298,11 @@ export function UtilityTab({ canEdit, utilities, utilBuildings, utilBuildingData
                         editingBill={editingBill} setEditingBill={setEditingBill} editUtilityBill={editUtilityBill} />
                       <EditableCell canEdit={canEdit} value={bill.account_number || "—"} field="account_number" billId={bill.id} type="text"
                         editingBill={editingBill} setEditingBill={setEditingBill} editUtilityBill={editUtilityBill} />
-                      <span className="text-stone-500">{bill.usage_quantity ? `${bill.usage_quantity} ${bill.usage_unit || ""}` : "—"}</span>
+                      <span className="text-stone-500">{bill.usage_quantity != null ? `${bill.usage_quantity} ${bill.usage_unit || ""}` : "—"}</span>
                       <span className="text-stone-500 truncate">{bill.provider_name || "—"}</span>
                       <button disabled={!canEdit} onClick={() => deleteUtilityBill(bill.id)}
                         className="text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity text-right">✕</button>
-                    </div>
+                    </div><UtilityBillDetails bill={bill} canEdit={canEdit} refreshData={refreshData} /></div>
                   ))}
                 </div>
               </div>
