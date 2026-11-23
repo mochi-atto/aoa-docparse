@@ -1,7 +1,8 @@
 import type { WorkOrderAction } from "./dashboard/WorkOrderActions";
 import ManageMembersModal from "../components/ManageMembersModal";
-import { memberApi, type ParishRole } from "../services/api";
+import { exportApi, memberApi, type ParishRole } from "../services/api";
 import { errorDetail } from "../services/errors";
+import { blobErrorMessage, filenameFromDisposition, saveBlob } from "../services/download";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -18,6 +19,8 @@ import { RisksTab } from "./dashboard/RisksTab";
 import { UtilityTab } from "./dashboard/UtilityTab";
 import { ValuationsTab } from "./dashboard/ValuationsTab";
 
+const secondaryButton = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 disabled:opacity-60 disabled:cursor-wait";
+
 export default function DashboardPage() {
   const { parishId } = useParams<{ parishId: string }>();
   const navigate = useNavigate();
@@ -26,6 +29,8 @@ export default function DashboardPage() {
   const [role, setRole] = useState<ParishRole | null>(null);
   const [membersOpen, setMembersOpen] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
   const isAdmin = role === "admin";
   const canEdit = isAdmin || role === "editor";
 
@@ -80,6 +85,7 @@ export default function DashboardPage() {
   // Building management
   const [showBuildingMgmt, setShowBuildingMgmt] = useState(false);
   const [newBuildingName, setNewBuildingName] = useState("");
+  const [showAddBuilding, setShowAddBuilding] = useState(false);
   const [confirmDeleteBuilding, setConfirmDeleteBuilding] = useState<number | null>(null);
   const [renamingBuilding, setRenamingBuilding] = useState<{ id: number; name: string } | null>(null);
 
@@ -337,6 +343,21 @@ export default function DashboardPage() {
     } catch (err) { console.error("Failed to rename parish:", err); }
   };
 
+  // ── Excel export ──
+  const exportParish = async () => {
+    if (!parishId) return;
+    setExporting(true);
+    setExportError("");
+    try {
+      const res = await exportApi.parish(parishId);
+      saveBlob(res.data, filenameFromDisposition(res.headers["content-disposition"], "parish_export.xlsx"));
+    } catch (err) {
+      setExportError(await blobErrorMessage(err, "Export failed. Please try again."));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // ── Image upload (saved to DB via parish update) ──
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
@@ -362,6 +383,7 @@ export default function DashboardPage() {
       const res = await api.post(`/parishes/${parishId}/buildings`, { name: newBuildingName.trim() });
       setBuildings((prev: BuildingData[]) => [...prev, res.data]);
       setNewBuildingName("");
+      setShowAddBuilding(false);
       showToast(`Building "${res.data.name}" added`);
     } catch (err) { console.error(err); showToast("Failed to add building", "error"); }
   };
@@ -650,6 +672,8 @@ export default function DashboardPage() {
                 <p className="text-sm text-stone-400 mt-0.5">{parish?.diocese}{parish?.address ? ` · ${parish.address}` : ""}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-xs text-stone-400">{buildings.length} building{buildings.length !== 1 ? "s" : ""}</span>
+                  <button disabled={!isAdmin} onClick={() => setShowAddBuilding(true)}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-stone-300 text-white px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm">+ Add building</button>
                   <button disabled={!isAdmin} onClick={() => setShowBuildingMgmt(!showBuildingMgmt)}
                     className="text-xs text-blue-600 hover:text-blue-700 font-medium">
                     {showBuildingMgmt ? "Close ▴" : "Manage ▾"}
@@ -659,21 +683,37 @@ export default function DashboardPage() {
               <div className="flex-shrink-0 text-right">
                 <p className="text-xs text-stone-400">Last updated</p>
                 <p className="text-sm font-medium text-stone-600">{lastUpdated ? fmtDate(lastUpdated) : "No data yet"}</p>
+                <button onClick={exportParish} disabled={exporting} aria-busy={exporting} className={`${secondaryButton} mt-2`}>
+                  {exporting && <span className="w-3 h-3 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />}
+                  {exporting ? "Exporting…" : "Export to Excel"}
+                </button>
+                {exportError && <p role="alert" className="text-xs text-red-500 mt-1 max-w-56 ml-auto">{exportError}</p>}
               </div>
             </div>
+
+            {/* Add building prompt */}
+            {isAdmin && showAddBuilding && (
+              <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => { setShowAddBuilding(false); setNewBuildingName(""); }}>
+                <form className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}
+                  onSubmit={(e) => { e.preventDefault(); addBuilding(); }}>
+                  <h3 className="text-base font-semibold text-stone-800" style={{ fontFamily: "'Fraunces', serif" }}>Add building</h3>
+                  <label className="flex flex-col gap-1 text-xs text-stone-500 mt-3">Building name
+                    <input value={newBuildingName} onChange={(e) => setNewBuildingName(e.target.value)} autoFocus placeholder="e.g., Parish Hall"
+                      className="border border-stone-300 rounded-lg px-3 py-2 text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-300" />
+                  </label>
+                  <div className="flex justify-end gap-2 mt-4">
+                    <button type="button" onClick={() => { setShowAddBuilding(false); setNewBuildingName(""); }} className="px-4 py-2 rounded-lg text-sm border border-stone-300 text-stone-600 hover:bg-stone-50">Cancel</button>
+                    <button type="submit" disabled={!newBuildingName.trim()} className="bg-blue-600 hover:bg-blue-700 disabled:bg-stone-300 text-white px-4 py-2 rounded-lg text-sm font-medium">Add building</button>
+                  </div>
+                </form>
+              </div>
+            )}
 
             {/* Building management dropdown */}
             {isAdmin && showBuildingMgmt && (
               <div className="border-t border-stone-100 px-5 py-3 bg-stone-50/50">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-xs font-semibold text-stone-600">Buildings</h4>
-                  <div className="flex items-center gap-2">
-                    <input value={newBuildingName} onChange={(e) => setNewBuildingName(e.target.value)} placeholder="New building name"
-                      onKeyDown={(e) => e.key === "Enter" && addBuilding()}
-                      className="border border-stone-300 rounded-lg px-2.5 py-1 text-xs w-40 focus:outline-none focus:ring-1 focus:ring-stone-400" />
-                    <button onClick={addBuilding} disabled={!newBuildingName.trim()}
-                      className="bg-stone-800 hover:bg-stone-900 disabled:bg-stone-300 text-white px-2.5 py-1 rounded-lg text-xs font-medium">Add</button>
-                  </div>
                 </div>
                 <div className="space-y-1">
                   {buildings.map((b) => (
@@ -713,7 +753,7 @@ export default function DashboardPage() {
             {/* Upload bar */}
             {isAdmin && <div className="border-t border-stone-100 px-5 py-3 bg-stone-50/50">
               <div className="flex items-center gap-3">
-                <button onClick={() => setMembersOpen(true)} className="border rounded px-3 py-1 text-xs">Manage Members</button><span className="text-xs text-stone-500">Upload:</span>
+                <button onClick={() => setMembersOpen(true)} className={secondaryButton}>Manage Members</button><span className="text-xs text-stone-500">Upload:</span>
                 <div className="flex rounded-lg border border-stone-200 overflow-hidden">
                   {(["utility", "appraisal"] as const).map((t) => (
                     <button key={t} onClick={() => { setUploadType(t); setStagedFiles([]); setUploadProgress({}); setUploadMsg(""); }}
@@ -794,7 +834,7 @@ export default function DashboardPage() {
             newTaskPriority={newTaskPriority} setNewTaskPriority={setNewTaskPriority}
             addTask={addTask} buildings={buildings} workOrders={workOrders}
           />}
-          {activeTab === "risks" && <RisksTab role={role} subject={user?.sub} transitionOrder={transitionOrder} canEdit={canEdit} canDelete={isAdmin}
+          {activeTab === "risks" && <RisksTab parishId={parishId} role={role} subject={user?.sub} transitionOrder={transitionOrder} canEdit={canEdit} canDelete={isAdmin}
             todos={todos} toggleTodo={toggleTodo} todoBuildings={todoBuildings}
             showAddTask={showAddTask} setShowAddTask={setShowAddTask}
             newTaskText={newTaskText} setNewTaskText={setNewTaskText}
@@ -806,7 +846,7 @@ export default function DashboardPage() {
             setEditTaskText={setEditTaskText} setEditTaskPriority={setEditTaskPriority} setEditTaskBuilding={setEditTaskBuilding} deleteTask={deleteTask}
             workOrders={workOrders} createWorkOrder={createWorkOrder}
           />}
-          {activeTab === "assets" && <AssetsTab canManage={isAdmin} canAttach={canEdit} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} showToast={showToast} onChanged={refreshHistory} />}
+          {activeTab === "assets" && <AssetsTab buildings={buildings} canManage={isAdmin} canAttach={canEdit} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} showToast={showToast} onChanged={refreshHistory} />}
           {activeTab === "utility" && <UtilityTab canEdit={isAdmin} utilities={utilities} utilBuildings={utilBuildings} utilBuildingData={utilBuildingData} allMonths={allMonths} buildings={buildings} parishId={parishId} getAccessTokenSilently={getAccessTokenSilently} setBuildings={setBuildings} refreshData={refreshData} editUtilityBill={editUtilityBill} deleteUtilityBill={deleteUtilityBill} showToast={showToast} />}
           {activeTab === "valuations" && <ValuationsTab canEdit={isAdmin} buildingVals={buildingVals} totalVal={totalVal} totalValPct={totalValPct} appraisals={appraisals} buildings={buildings} editAppraisal={editAppraisal} />}
           {activeTab === "finances" && <FinancesTab utilities={utilities} estMonthly={estMonthly} bldgFinances={bldgFinances} todos={todos} />}

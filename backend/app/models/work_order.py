@@ -40,4 +40,12 @@ class WorkOrder(Base):
     building = relationship("Building")
     asset = relationship("Asset")
 
+    notes = relationship(
+        "WorkOrderNote",
+        order_by="WorkOrderNote.created_at",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
 

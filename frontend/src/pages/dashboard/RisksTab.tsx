@@ -6,8 +6,9 @@ import { PRIORITY, PRIO_ORDER, WO_PRIORITY_BADGE, WO_STATUS_LABEL } from "./cons
 import { fmtDate, sortByPriority } from "./helpers";
 import { AddTaskForm } from "./components";
 import { WorkOrderForm } from "./WorkOrderForm";
+import WorkOrderNotes from "./WorkOrderNotes";
 
-export function RisksTab({ role, subject, transitionOrder, canEdit, canDelete, todos, toggleTodo, todoBuildings, showAddTask, setShowAddTask, newTaskText, setNewTaskText, newTaskBuilding, setNewTaskBuilding, newTaskPriority, setNewTaskPriority, addTask, prioCounts, buildings, editingTaskId, editTaskText, editTaskPriority, editTaskBuilding, startEditTask, saveEditTask, setEditingTaskId, setEditTaskText, setEditTaskPriority, setEditTaskBuilding, deleteTask, workOrders, createWorkOrder }: Pick<DashboardViewProps, "role" | "subject" | "transitionOrder" | "canEdit" | "canDelete" | "todos" | "toggleTodo" | "todoBuildings" | "showAddTask" | "setShowAddTask" | "newTaskText" | "setNewTaskText" | "newTaskBuilding" | "setNewTaskBuilding" | "newTaskPriority" | "setNewTaskPriority" | "addTask" | "prioCounts" | "buildings" | "editingTaskId" | "editTaskText" | "editTaskPriority" | "editTaskBuilding" | "startEditTask" | "saveEditTask" | "setEditingTaskId" | "setEditTaskText" | "setEditTaskPriority" | "setEditTaskBuilding" | "deleteTask" | "workOrders" | "createWorkOrder">) {
+export function RisksTab({ parishId, role, subject, transitionOrder, canEdit, canDelete, todos, toggleTodo, todoBuildings, showAddTask, setShowAddTask, newTaskText, setNewTaskText, newTaskBuilding, setNewTaskBuilding, newTaskPriority, setNewTaskPriority, addTask, prioCounts, buildings, editingTaskId, editTaskText, editTaskPriority, editTaskBuilding, startEditTask, saveEditTask, setEditingTaskId, setEditTaskText, setEditTaskPriority, setEditTaskBuilding, deleteTask, workOrders, createWorkOrder }: Pick<DashboardViewProps, "role" | "subject" | "transitionOrder" | "canEdit" | "canDelete" | "todos" | "toggleTodo" | "todoBuildings" | "showAddTask" | "setShowAddTask" | "newTaskText" | "setNewTaskText" | "newTaskBuilding" | "setNewTaskBuilding" | "newTaskPriority" | "setNewTaskPriority" | "addTask" | "prioCounts" | "buildings" | "editingTaskId" | "editTaskText" | "editTaskPriority" | "editTaskBuilding" | "startEditTask" | "saveEditTask" | "setEditingTaskId" | "setEditTaskText" | "setEditTaskPriority" | "setEditTaskBuilding" | "deleteTask" | "workOrders" | "createWorkOrder"> & { parishId: string | number | undefined }) {
   // Which form is open: a todo id (linked work order) or "new" (standalone)
   const [woFormFor, setWoFormFor] = useState<number | "new" | null>(null);
   const woByTodo = useMemo(() => {
@@ -105,6 +106,7 @@ export function RisksTab({ role, subject, transitionOrder, canEdit, canDelete, t
                 <WorkOrderActions order={wo} role={role} subject={subject} transition={transitionOrder} />
                 <span className="text-xs text-stone-500 w-24 text-right">{WO_STATUS_LABEL[wo.status] || wo.status}</span>
                 <span className="text-xs text-stone-400 w-24 text-right tabular-nums">{wo.due_date ? `Due ${fmtDate(wo.due_date + "T00:00:00")}` : ""}</span>
+                {parishId != null && <WorkOrderNotes parishId={parishId} order={wo} canAdd={canEdit} />}
               </div>
             );
           })}

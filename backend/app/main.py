@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
 from app.config import settings
-from app.routers import parishes, upload, data, templates, parish_data, work_orders, users, assets, account
+from app.routers import parishes, upload, data, templates, parish_data, work_orders, users, assets, account, export
 
 # Import all models so create_all picks them up
 from app.models.parish import Parish  # noqa
@@ -46,6 +46,7 @@ app.include_router(parish_data.router, prefix="/api/parishes", tags=["Parish Dat
 app.include_router(work_orders.router, prefix="/api/parishes", tags=["Work Orders"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(assets.router, prefix="/api/parishes", tags=["Assets"])
+app.include_router(export.router, prefix="/api/parishes", tags=["Export"])
 
 
 app.include_router(account.router, prefix="/api/account", tags=["Account"])

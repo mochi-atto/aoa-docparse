@@ -12,7 +12,7 @@ from app.database import Base, engine
 def load_models():
     from app.models import account, appraisal, asset, building, extraction_template
     from app.models import history_entry, parish, parish_member, todo, user_profile, utility_bill, work_order
-
+    from app.models import work_order_note
 
 def pending(connection):
     schema = inspect(connection)
@@ -28,6 +28,11 @@ def pending(connection):
         changes.append("ALTER TABLE work_orders ADD COLUMN asset_id INTEGER REFERENCES assets(id) ON DELETE SET NULL")
     if "extraction_templates" in tables and "parish_id" not in {c["name"] for c in schema.get_columns("extraction_templates")}:
         changes.append("ALTER TABLE extraction_templates ADD COLUMN parish_id INTEGER REFERENCES parishes(id)")
+    if "assets" in tables:
+        asset_cols = {c["name"] for c in schema.get_columns("assets")}
+        for col in ("serial_number", "model_number", "photo_path"):
+            if col not in asset_cols:
+                changes.append(f"ALTER TABLE assets ADD COLUMN {col} VARCHAR")
     return changes
 
 
