@@ -780,21 +780,33 @@ export default function DashboardPage() {
             </div>
 
             {/* Tabs */}
-            <nav role="tablist" aria-label="Dashboard views" className="border-t border-stone-100 px-5 flex gap-0 overflow-x-auto">
-              {TABS.map((tab) => (
-                <button key={tab.key} role="tab" aria-selected={activeTab === tab.key} id={`tab-${tab.key}`} aria-controls={`panel-${tab.key}`}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 ${activeTab === tab.key ? "text-stone-800 border-stone-800" : "text-stone-600 border-transparent hover:text-stone-800 hover:border-stone-300"
-                    }`}>
-                  {tab.label}
-                </button>
-              ))}
+            <nav role="tablist" aria-label="Dashboard views" className="border-t border-stone-200/80 px-5 py-2.5 flex items-center gap-1.5 overflow-x-auto bg-stone-50/70">
+              {TABS.map((tab) => {
+                const isActive = activeTab === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    role="tab"
+                    aria-selected={isActive}
+                    id={`tab-${tab.key}`}
+                    aria-controls={`panel-${tab.key}`}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`px-4 py-2 text-base rounded-lg transition-all whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 ${
+                      isActive
+                        ? "bg-stone-800 text-white font-semibold shadow-sm"
+                        : "text-stone-700 hover:text-stone-900 hover:bg-stone-200/70 font-medium"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </nav>
           </div>
         </div>
 
         {/* ═══ Tab Content ═══ */}
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div id={`panel-${activeTab}`} role="tabpanel" aria-labelledby={`tab-${activeTab}`} className="max-w-7xl mx-auto px-6 py-4">
           {activeTab === "dashboard" && <DashboardTab
             utilities={utilities} appraisals={appraisals} todos={todos} history={history}
             utilMonthly={utilMonthly} allMonths={allMonths} buildingVals={buildingVals}
