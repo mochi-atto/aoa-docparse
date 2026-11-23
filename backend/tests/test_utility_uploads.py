@@ -75,3 +75,27 @@ class UtilityUploadTests(unittest.TestCase):
 
     def test_concurrent_retries_commit_only_one_bill_and_audit(self):
         asyncio.run(benchmark(same_key=True))
+
+    @unittest.skipUnless(__import__('os').environ.get('TEST_POSTGRES_URL'), 'Disposable PostgreSQL URL not supplied')
+    def test_concurrent_retries_postgres(self):
+        import os
+        import uuid
+        from sqlalchemy import create_engine, text
+        from sqlalchemy.engine import make_url
+        url = make_url(os.environ['TEST_POSTGRES_URL'])
+        self.assertIn(url.host, {'localhost', '127.0.0.1'})
+        self.assertEqual(url.port, 55432)
+        schema = 'aoa_upload_' + uuid.uuid4().hex
+        bootstrap = create_engine(url)
+        target = None
+        try:
+            with bootstrap.begin() as connection:
+                connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+            target = create_engine(url, connect_args={'options': f'-csearch_path={schema}'})
+            asyncio.run(benchmark(same_key=True, target=target))
+        finally:
+            if target is not None:
+                target.dispose()
+            with bootstrap.begin() as connection:
+                connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+            bootstrap.dispose()

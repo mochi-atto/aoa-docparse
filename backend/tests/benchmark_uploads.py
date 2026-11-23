@@ -21,12 +21,16 @@ def synthetic_pdf():
         return doc.tobytes()
 
 
-async def benchmark(same_key=False):
+async def benchmark(same_key=False, target=None):
     load_models()
     with tempfile.TemporaryDirectory() as directory:
-        engine = create_engine(f'sqlite:///{directory}/test.sqlite', connect_args={'check_same_thread': False})
+        engine = target or create_engine(f'sqlite:///{directory}/test.sqlite', connect_args={'check_same_thread': False})
         Base.metadata.create_all(engine)
         sessions = sessionmaker(bind=engine)
+        from app.models.parish import Parish
+        with sessions() as db:
+            db.add(Parish(id=1, name="Synthetic concurrency parish"))
+            db.commit()
         app = FastAPI()
         app.include_router(upload.router, prefix='/upload')
         def database():

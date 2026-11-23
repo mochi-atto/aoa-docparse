@@ -84,6 +84,9 @@ No production API keys or hosted tenant credentials were used. No conclusion
 about the original tunnel/infrastructure failure is claimed.
 
 Executed on this worktree: pip check passed; pytest with disposable PostgreSQL
-16 passed 79 tests (no skips); offline pytest passed 73, skipped 6 PostgreSQL
+16 passed 80 tests (no skips); offline pytest passed 73, skipped 6 PostgreSQL
 checks; frontend 4 tests, lint and production build passed. Existing Pydantic
 deprecations and Vite bundle-size warning remain.
+
+Follow-up: simultaneous same-key retries also verified against PostgreSQL 16;
+per-file extraction errors are rendered beside the staged file for actionable retry.
