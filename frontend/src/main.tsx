@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { Auth0Provider } from "@auth0/auth0-react";
 import { BrowserRouter } from "react-router-dom";
-import App from "./App";
+import AuthenticatedApp from "./components/AuthenticatedApp";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -13,10 +13,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       authorizationParams={{
         redirect_uri: window.location.origin + "/callback",
         audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+        scope: "openid profile email",
       }}
     >
       <BrowserRouter>
-        <App />
+        <AuthenticatedApp />
       </BrowserRouter>
     </Auth0Provider>
   </React.StrictMode>

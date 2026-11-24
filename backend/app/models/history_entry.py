@@ -10,7 +10,7 @@ class HistoryEntry(Base):
     id = Column(Integer, primary_key=True, index=True)
     parish_id = Column(Integer, ForeignKey("parishes.id"), nullable=False)
 
-    entry_type = Column(String, nullable=False)  # upload, task_added, task_changed, task_addressed, edit, delete
+    entry_type = Column(String, nullable=False)  # asset, upload, task_added, task_changed, task_addressed, edit, delete
     description = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 

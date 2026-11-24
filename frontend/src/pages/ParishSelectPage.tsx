@@ -1,9 +1,11 @@
+import { errorDetail } from "../services/errors";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { setAuthToken } from "../services/api";
 
 interface Parish {
+  role?: "admin" | "editor" | "viewer";
   id: number;
   name: string;
   diocese: string | null;
@@ -38,7 +40,7 @@ export default function ParishSelectPage() {
         setAuthToken(token);
         const res = await api.get("/parishes/");
         setParishes(res.data);
-      } catch (err) { console.error(err); }
+      } catch (err) { setError(errorDetail(err) || "Could not load parishes. Please try again."); }
       finally { setLoading(false); }
     })();
   }, [getAccessTokenSilently]);
@@ -60,8 +62,8 @@ export default function ParishSelectPage() {
       });
       setParishes((prev) => [...prev, res.data]);
       setNewName(""); setNewBuildings([""]); setShowCreate(false);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || "Failed to create parish");
+    } catch (err) {
+      setError(errorDetail(err) || "Failed to create parish");
     } finally { setCreating(false); }
   };
 
@@ -91,8 +93,8 @@ export default function ParishSelectPage() {
       await api.delete(`/parishes/${deleteTarget.id}`);
       setParishes((prev) => prev.filter((p) => p.id !== deleteTarget.id));
       closeDeleteModal();
-    } catch (err: any) {
-      setDeleteError(err?.response?.data?.detail || "Failed to delete parish");
+    } catch (err) {
+      setDeleteError(errorDetail(err) || "Failed to delete parish");
     } finally { setDeleting(false); }
   };
 
@@ -113,6 +115,7 @@ export default function ParishSelectPage() {
           </div>
 
           {/* Parish list */}
+          {error && !showCreate && <p role="alert" className="text-sm text-red-600 mb-4">{error}</p>}
           {loading ? (
             <div className="flex justify-center py-12"><div className="w-8 h-8 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" /></div>
           ) : (
@@ -124,6 +127,7 @@ export default function ParishSelectPage() {
                     <div className="flex items-center justify-between pr-8">
                       <div>
                         <span className="font-semibold text-stone-800" style={{ fontFamily: "'Fraunces', serif" }}>{p.name}</span>
+                        <span className="ml-2 text-xs text-stone-500 capitalize">{p.role}</span>
                         {p.diocese && <span className="text-sm text-stone-400 ml-2">· {p.diocese}</span>}
                       </div>
                       <span className="text-stone-300 group-hover:text-stone-500 transition-colors">→</span>
@@ -134,7 +138,7 @@ export default function ParishSelectPage() {
                       ))}</div>
                     )}
                   </button>
-                  <button
+                  <button hidden={p.role !== "admin"}
                     onClick={(e) => openDeleteModal(p, e)}
                     className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity text-stone-300 hover:text-red-500 p-1 rounded"
                     title="Delete parish"
@@ -154,7 +158,7 @@ export default function ParishSelectPage() {
           )}
 
           {/* Create button / form */}
-          {!showCreate ? (
+          {(parishes.length === 0 || parishes.some(p => p.role === "admin")) && (!showCreate ? (
             <button onClick={() => setShowCreate(true)}
               className="w-full bg-stone-800 hover:bg-stone-900 text-white py-3 rounded-xl text-sm font-medium transition-colors">
               + Create New Parish
@@ -204,7 +208,7 @@ export default function ParishSelectPage() {
                 </div>
               </div>
             </div>
-          )}
+          ))}
         </div>
       </div>
 

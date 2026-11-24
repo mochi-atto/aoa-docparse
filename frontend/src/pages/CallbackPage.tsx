@@ -8,7 +8,9 @@ export default function CallbackPage() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      navigate("/parishes");
+      const returnTo = sessionStorage.getItem("invitationReturnTo");
+      sessionStorage.removeItem("invitationReturnTo");
+      navigate(returnTo?.startsWith("/invite/") ? returnTo : "/parishes", { replace: true });
     }
   }, [isLoading, isAuthenticated, navigate]);
 

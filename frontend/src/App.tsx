@@ -7,6 +7,8 @@ import DashboardPage from "./pages/DashboardPage";
 import AppraisalEntryPage from "./pages/AppraisalEntryPage";
 import AccountPage from "./pages/AccountPage";
 
+import InvitationPage from "./pages/InvitationPage";
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth0();
 
@@ -29,6 +31,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LoginPage />} />
+      <Route path="/invite/:token" element={<InvitationPage />} />
       <Route path="/callback" element={<CallbackPage />} />
       <Route path="/parishes" element={<ProtectedRoute><ParishSelectPage /></ProtectedRoute>} />
       <Route path="/dashboard/:parishId" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />

@@ -3,10 +3,11 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
+  envDir: process.env.AOA_ENV_DIR,
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      "/api": "http://localhost:8000",
+      "/api": process.env.AOA_API_TARGET || "http://localhost:8000",
     },
   },
 });

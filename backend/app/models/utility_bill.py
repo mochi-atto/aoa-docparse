@@ -30,6 +30,8 @@ class UtilityBill(Base):
     usage_unit = Column(String, nullable=True)            # kWh, therms, gallons, etc.
     rate = Column(Float, nullable=True)                   # cost per unit if available
 
+    usage_note = Column(String(2000), nullable=True)  # Optional bill-level context
+
     # Raw extraction for debugging
     raw_extracted = Column(JSON, nullable=True)           # Full LLM response
 

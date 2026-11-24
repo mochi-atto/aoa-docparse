@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.auth import verify_token
+from app.auth import parish_access, parish_admin_access, current_account
 from app.models.utility_bill import UtilityBill
 from app.models.appraisal import Appraisal
 from app.models.building import Building
 from app.models.history_entry import HistoryEntry
 from app.schemas.documents import UtilityChartPoint, AppraisalChartPoint
 from typing import List
+from app.schemas.documents import ManualUtilityBill
+from app.services.utility_usage import normalize_usage, energy_density, valuation_area
 
 router = APIRouter()
 
@@ -15,17 +17,17 @@ router = APIRouter()
 # The LLM may return "trash", "sewer", "sewage", etc. — normalize to canonical types.
 UTIL_TYPE_MAP = {
     "electric": "electric", "electricity": "electric", "power": "electric",
-    "water": "water",
-    "gas": "gas", "natural gas": "gas",
+    "water": "water", "sewer": "water", "sewage": "water", "wastewater": "water", "stormwater": "water",
+    "gas": "gas", "natural gas": "gas", "propane": "gas",
     "waste": "waste", "trash": "waste", "garbage": "waste", "refuse": "waste", "solid waste": "waste",
-    "sewer": "waste", "sewage": "waste", "wastewater": "waste",
-    "internet": "internet", "phone": "phone", "other": "other",
+    "sanitation": "waste", "recycling": "waste",
+    "other": "other",
 }
 
 def _normalize_util_type(raw: str | None) -> str:
     if not raw:
         return "other"
-    return UTIL_TYPE_MAP.get(raw.lower().strip(), raw.lower().strip())
+    return UTIL_TYPE_MAP.get(raw.lower().strip(), "other")
 
 
 def _build_account_map(parish_id: int, db: Session) -> dict[str, str]:
@@ -45,17 +47,14 @@ def get_utility_data(
     utility_type: str = Query(None),
     building_name: str = Query(None),
     db: Session = Depends(get_db),
-    user=Depends(verify_token),
+    membership=Depends(parish_access),
 ):
     query = db.query(UtilityBill).filter(UtilityBill.parish_id == parish_id)
-    if utility_type:
-        query = query.filter(UtilityBill.utility_type == utility_type)
-    if building_name:
-        query = query.filter(UtilityBill.building_name == building_name)
     records = query.order_by(UtilityBill.bill_date.asc()).all()
 
     acct_map = _build_account_map(parish_id, db)
 
+    appraisals = get_appraisal_data(parish_id, db, membership)
     results = []
     for r in records:
         resolved_building = r.building_name
@@ -63,7 +62,13 @@ def get_utility_data(
             resolved_building = acct_map.get(str(r.account_number).strip())
         if not resolved_building:
             resolved_building = r.service_address
+        if utility_type and _normalize_util_type(r.utility_type) != _normalize_util_type(utility_type):
+            continue
+        if building_name and resolved_building != building_name:
+            continue
 
+        quantity, unit = normalize_usage(r.usage_quantity, r.usage_unit, _normalize_util_type(r.utility_type))
+        sqft, valuation_date = valuation_area(appraisals, resolved_building, r.billing_period_end or r.bill_date)
         results.append(UtilityChartPoint(
             id=r.id,
             bill_date=r.bill_date,
@@ -74,11 +79,37 @@ def get_utility_data(
             building_name=resolved_building,
             account_number=r.account_number,
             original_filename=r.original_filename,
-            usage_quantity=r.usage_quantity,
-            usage_unit=r.usage_unit,
+            usage_quantity=quantity,
+            usage_unit=unit,
+            billing_period_start=r.billing_period_start,
+            billing_period_end=r.billing_period_end,
+            usage_note=r.usage_note,
+            valuation_sq_ft=sqft,
+            valuation_date=valuation_date,
+            energy_per_sq_ft=energy_density(quantity, unit, _normalize_util_type(r.utility_type), sqft),
         ))
 
     return results
+
+
+@router.post("/utility/manual")
+def create_utility_manual(data: ManualUtilityBill, db: Session = Depends(get_db), account=Depends(current_account)):
+    parish_admin_access(parish_access(data.parish_id, account, db))
+    if data.building_name and data.building_name != "General Expenses":
+        building = db.query(Building).filter_by(parish_id=data.parish_id, name=data.building_name).first()
+        if not building:
+            raise HTTPException(422, "Choose a building in this parish")
+    values = data.model_dump()
+    values["utility_type"] = _normalize_util_type(data.utility_type)
+    values["usage_quantity"], values["usage_unit"] = normalize_usage(data.usage_quantity, data.usage_unit, values["utility_type"])
+    if data.billing_period_start and data.billing_period_end and data.billing_period_start > data.billing_period_end:
+        raise HTTPException(422, "Billing period end must follow start")
+    record = UtilityBill(original_filename="manual_entry", **values)
+    db.add(record)
+    db.add(HistoryEntry(parish_id=data.parish_id, entry_type="upload", description="Utility bill entered manually",
+        snapshot={"actor_sub": account.auth0_sub}))
+    db.commit()
+    return {"id": record.id}
 
 
 @router.put("/utility/{bill_id}")
@@ -86,13 +117,21 @@ def update_utility_bill(
     bill_id: int,
     data: dict,
     db: Session = Depends(get_db),
-    user=Depends(verify_token),
+    account=Depends(current_account),
 ):
     record = db.query(UtilityBill).filter(UtilityBill.id == bill_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Utility bill not found")
+    parish_admin_access(parish_access(record.parish_id, account, db))
 
+    if "usage_note" in data and data["usage_note"] is not None and (not isinstance(data["usage_note"], str) or len(data["usage_note"]) > 2000):
+        raise HTTPException(422, "Usage note must be text up to 2000 characters")
     changes = []
+    if "usage_note" in data:
+        note = (data["usage_note"] or "").strip() or None
+        if record.usage_note != note:
+            record.usage_note = note
+            changes.append("usage_note updated" if note else "usage_note cleared")
     editable_str = {"provider_name", "utility_type", "service_address", "building_name", "account_number", "usage_unit"}
     editable_float = {"total_amount", "usage_quantity", "rate"}
     editable_date = {"bill_date", "due_date", "billing_period_start", "billing_period_end"}
@@ -136,10 +175,11 @@ def update_utility_bill(
 
 
 @router.delete("/utility/{bill_id}")
-def delete_utility_bill(bill_id: int, db: Session = Depends(get_db), user=Depends(verify_token)):
+def delete_utility_bill(bill_id: int, db: Session = Depends(get_db), account=Depends(current_account)):
     record = db.query(UtilityBill).filter(UtilityBill.id == bill_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Utility bill not found")
+    parish_admin_access(parish_access(record.parish_id, account, db))
     desc = f"Deleted utility bill: {_normalize_util_type(record.utility_type)} ${record.total_amount:.2f} ({record.bill_date})"
     db.add(HistoryEntry(parish_id=record.parish_id, entry_type="task_changed", description=desc))
     db.delete(record)
@@ -150,7 +190,7 @@ def delete_utility_bill(bill_id: int, db: Session = Depends(get_db), user=Depend
 # ── Appraisal endpoints ──
 
 @router.get("/appraisal/{parish_id}", response_model=List[AppraisalChartPoint])
-def get_appraisal_data(parish_id: int, db: Session = Depends(get_db), user=Depends(verify_token)):
+def get_appraisal_data(parish_id: int, db: Session = Depends(get_db), membership=Depends(parish_access)):
     records = db.query(Appraisal).filter(Appraisal.parish_id == parish_id).order_by(Appraisal.appraisal_date.asc()).all()
     results = []
     for r in records:
@@ -195,13 +235,14 @@ def get_appraisal_data(parish_id: int, db: Session = Depends(get_db), user=Depen
 
 
 @router.put("/appraisal/{appraisal_id}")
-def update_appraisal(appraisal_id: int, data: dict, db: Session = Depends(get_db), user=Depends(verify_token)):
+def update_appraisal(appraisal_id: int, data: dict, db: Session = Depends(get_db), account=Depends(current_account)):
     """Edit an appraisal record. Updates both the DB record and the raw_extracted sections."""
     from datetime import date as date_type
 
     record = db.query(Appraisal).filter(Appraisal.id == appraisal_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Appraisal not found")
+    parish_admin_access(parish_access(record.parish_id, account, db))
 
     changes = []
 
@@ -284,10 +325,11 @@ def update_appraisal(appraisal_id: int, data: dict, db: Session = Depends(get_db
 
 
 @router.delete("/appraisal/{appraisal_id}")
-def delete_appraisal(appraisal_id: int, db: Session = Depends(get_db), user=Depends(verify_token)):
+def delete_appraisal(appraisal_id: int, db: Session = Depends(get_db), account=Depends(current_account)):
     record = db.query(Appraisal).filter(Appraisal.id == appraisal_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Appraisal not found")
+    parish_admin_access(parish_access(record.parish_id, account, db))
     desc = f"Deleted appraisal: {record.entity_name or 'Unknown'} ({record.appraisal_date})"
     db.add(HistoryEntry(parish_id=record.parish_id, entry_type="task_changed", description=desc))
     db.delete(record)
@@ -296,12 +338,14 @@ def delete_appraisal(appraisal_id: int, db: Session = Depends(get_db), user=Depe
 
 
 @router.post("/appraisal/manual")
-def create_appraisal_manual(data: dict, db: Session = Depends(get_db), user=Depends(verify_token)):
+def create_appraisal_manual(data: dict, db: Session = Depends(get_db), account=Depends(current_account)):
     from datetime import date as date_type
 
     parish_id = data.get("parish_id")
     if not parish_id:
         raise HTTPException(status_code=400, detail="parish_id is required")
+
+    parish_admin_access(parish_access(parish_id, account, db))
 
     appraisal_date = None
     if data.get("appraisal_date"):
@@ -357,11 +401,12 @@ def create_appraisal_manual(data: dict, db: Session = Depends(get_db), user=Depe
 # ── Mark history as removed ──
 
 @router.post("/history/{entry_id}/mark-removed")
-def mark_history_removed(entry_id: int, db: Session = Depends(get_db), user=Depends(verify_token)):
+def mark_history_removed(entry_id: int, db: Session = Depends(get_db), account=Depends(current_account)):
     """Mark a history entry as 'removed' (data was deleted) without deleting the entry itself."""
     entry = db.query(HistoryEntry).filter(HistoryEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="History entry not found")
+    parish_admin_access(parish_access(entry.parish_id, account, db))
     entry.undone = "removed"
     db.commit()
     return {"detail": "Marked as removed"}

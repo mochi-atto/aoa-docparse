@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.auth import verify_token
+from app.auth import parish_access, parish_admin_access, parish_editor_access
 from app.models.todo import Todo
 from app.models.history_entry import HistoryEntry
 from pydantic import BaseModel
@@ -53,12 +53,12 @@ class HistoryResponse(BaseModel):
 # ── Todo endpoints ──
 
 @router.get("/{parish_id}/todos", response_model=List[TodoResponse])
-def list_todos(parish_id: int, db: Session = Depends(get_db), user=Depends(verify_token)):
+def list_todos(parish_id: int, db: Session = Depends(get_db), membership=Depends(parish_access)):
     return db.query(Todo).filter(Todo.parish_id == parish_id).order_by(Todo.created_at.asc()).all()
 
 
 @router.post("/{parish_id}/todos", response_model=TodoResponse)
-def create_todo(parish_id: int, data: TodoCreate, db: Session = Depends(get_db), user=Depends(verify_token)):
+def create_todo(parish_id: int, data: TodoCreate, db: Session = Depends(get_db), membership=Depends(parish_editor_access)):
     todo = Todo(parish_id=parish_id, text=data.text, building=data.building, priority=data.priority)
     db.add(todo)
     entry = HistoryEntry(parish_id=parish_id, entry_type="task_added", description=f'Task added: "{data.text}" for {data.building}')
@@ -69,7 +69,7 @@ def create_todo(parish_id: int, data: TodoCreate, db: Session = Depends(get_db),
 
 
 @router.put("/{parish_id}/todos/{todo_id}", response_model=TodoResponse)
-def update_todo(parish_id: int, todo_id: int, data: TodoUpdate, db: Session = Depends(get_db), user=Depends(verify_token)):
+def update_todo(parish_id: int, todo_id: int, data: TodoUpdate, db: Session = Depends(get_db), membership=Depends(parish_editor_access)):
     todo = db.query(Todo).filter(Todo.id == todo_id, Todo.parish_id == parish_id).first()
     if not todo:
         raise HTTPException(status_code=404, detail="Todo not found")
@@ -117,7 +117,7 @@ def update_todo(parish_id: int, todo_id: int, data: TodoUpdate, db: Session = De
 
 
 @router.delete("/{parish_id}/todos/{todo_id}")
-def delete_todo(parish_id: int, todo_id: int, db: Session = Depends(get_db), user=Depends(verify_token)):
+def delete_todo(parish_id: int, todo_id: int, db: Session = Depends(get_db), membership=Depends(parish_admin_access)):
     todo = db.query(Todo).filter(Todo.id == todo_id, Todo.parish_id == parish_id).first()
     if not todo:
         raise HTTPException(status_code=404, detail="Todo not found")
@@ -131,12 +131,12 @@ def delete_todo(parish_id: int, todo_id: int, db: Session = Depends(get_db), use
 # ── History endpoints ──
 
 @router.get("/{parish_id}/history", response_model=List[HistoryResponse])
-def list_history(parish_id: int, db: Session = Depends(get_db), user=Depends(verify_token)):
+def list_history(parish_id: int, db: Session = Depends(get_db), membership=Depends(parish_access)):
     return db.query(HistoryEntry).filter(HistoryEntry.parish_id == parish_id).order_by(HistoryEntry.created_at.desc()).all()
 
 
 @router.post("/{parish_id}/history", response_model=HistoryResponse)
-def create_history(parish_id: int, data: HistoryCreate, db: Session = Depends(get_db), user=Depends(verify_token)):
+def create_history(parish_id: int, data: HistoryCreate, db: Session = Depends(get_db), membership=Depends(parish_admin_access)):
     entry = HistoryEntry(parish_id=parish_id, entry_type=data.entry_type, description=data.description)
     db.add(entry)
     db.commit()
