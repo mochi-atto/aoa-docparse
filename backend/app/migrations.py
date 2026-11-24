@@ -31,6 +31,8 @@ def pending(connection):
         for col in ("serial_number", "model_number", "photo_path"):
             if col not in asset_cols:
                 changes.append(f"ALTER TABLE assets ADD COLUMN {col} VARCHAR")
+    if "utility_bills" in tables and "usage_note" not in {c["name"] for c in schema.get_columns("utility_bills")}:
+        changes.append("ALTER TABLE utility_bills ADD COLUMN usage_note VARCHAR(2000)")
     return changes
 
 

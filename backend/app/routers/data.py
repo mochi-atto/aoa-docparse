@@ -8,6 +8,8 @@ from app.models.building import Building
 from app.models.history_entry import HistoryEntry
 from app.schemas.documents import UtilityChartPoint, AppraisalChartPoint
 from typing import List
+from app.schemas.documents import ManualUtilityBill
+from app.services.utility_usage import normalize_usage, energy_density, valuation_area
 
 router = APIRouter()
 
@@ -52,6 +54,7 @@ def get_utility_data(
 
     acct_map = _build_account_map(parish_id, db)
 
+    appraisals = get_appraisal_data(parish_id, db, membership)
     results = []
     for r in records:
         resolved_building = r.building_name
@@ -64,6 +67,8 @@ def get_utility_data(
         if building_name and resolved_building != building_name:
             continue
 
+        quantity, unit = normalize_usage(r.usage_quantity, r.usage_unit, _normalize_util_type(r.utility_type))
+        sqft, valuation_date = valuation_area(appraisals, resolved_building, r.billing_period_end or r.bill_date)
         results.append(UtilityChartPoint(
             id=r.id,
             bill_date=r.bill_date,
@@ -74,11 +79,37 @@ def get_utility_data(
             building_name=resolved_building,
             account_number=r.account_number,
             original_filename=r.original_filename,
-            usage_quantity=r.usage_quantity,
-            usage_unit=r.usage_unit,
+            usage_quantity=quantity,
+            usage_unit=unit,
+            billing_period_start=r.billing_period_start,
+            billing_period_end=r.billing_period_end,
+            usage_note=r.usage_note,
+            valuation_sq_ft=sqft,
+            valuation_date=valuation_date,
+            energy_per_sq_ft=energy_density(quantity, unit, _normalize_util_type(r.utility_type), sqft),
         ))
 
     return results
+
+
+@router.post("/utility/manual")
+def create_utility_manual(data: ManualUtilityBill, db: Session = Depends(get_db), account=Depends(current_account)):
+    parish_admin_access(parish_access(data.parish_id, account, db))
+    if data.building_name and data.building_name != "General Expenses":
+        building = db.query(Building).filter_by(parish_id=data.parish_id, name=data.building_name).first()
+        if not building:
+            raise HTTPException(422, "Choose a building in this parish")
+    values = data.model_dump()
+    values["utility_type"] = _normalize_util_type(data.utility_type)
+    values["usage_quantity"], values["usage_unit"] = normalize_usage(data.usage_quantity, data.usage_unit, values["utility_type"])
+    if data.billing_period_start and data.billing_period_end and data.billing_period_start > data.billing_period_end:
+        raise HTTPException(422, "Billing period end must follow start")
+    record = UtilityBill(original_filename="manual_entry", **values)
+    db.add(record)
+    db.add(HistoryEntry(parish_id=data.parish_id, entry_type="upload", description="Utility bill entered manually",
+        snapshot={"actor_sub": account.auth0_sub}))
+    db.commit()
+    return {"id": record.id}
 
 
 @router.put("/utility/{bill_id}")
@@ -93,7 +124,14 @@ def update_utility_bill(
         raise HTTPException(status_code=404, detail="Utility bill not found")
     parish_admin_access(parish_access(record.parish_id, account, db))
 
+    if "usage_note" in data and data["usage_note"] is not None and (not isinstance(data["usage_note"], str) or len(data["usage_note"]) > 2000):
+        raise HTTPException(422, "Usage note must be text up to 2000 characters")
     changes = []
+    if "usage_note" in data:
+        note = (data["usage_note"] or "").strip() or None
+        if record.usage_note != note:
+            record.usage_note = note
+            changes.append("usage_note updated" if note else "usage_note cleared")
     editable_str = {"provider_name", "utility_type", "service_address", "building_name", "account_number", "usage_unit"}
     editable_float = {"total_amount", "usage_quantity", "rate"}
     editable_date = {"bill_date", "due_date", "billing_period_start", "billing_period_end"}

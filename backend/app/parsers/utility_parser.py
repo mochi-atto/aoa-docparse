@@ -7,6 +7,8 @@ documents produce separate records per billing period per building.
 Supports both text-based PDFs and scanned image PDFs (via OCR).
 """
 import json
+import math
+from app.services.utility_usage import normalize_usage
 from datetime import date
 from typing import Optional
 import httpx
@@ -89,6 +91,17 @@ MULTI-SERVICE STATEMENTS:
   one "waste" entry of 25.00.
 - Put usage_quantity/usage_unit on the "water" entry; use null on the others.
 - Do NOT also create an entry for the statement's grand total when per-type entries were created.
+
+CONSUMPTION RULES (usage_quantity / usage_unit):
+- Extract the actual CURRENT PERIOD BILLED CONSUMPTION for each service/account.
+- Electricity: kWh; natural gas: therms; water: gallons where printed.
+- Never use dollar charges, rates, demand (kW), cumulative meter readings,
+  prior-year comparison, daily averages, or chart/history values as billed usage.
+- A meter reading is not consumption. Prefer the explicitly labelled usage total.
+- For gas volume (CCF/MCF), use printed billed therms if supplied; otherwise keep
+  the printed volume unit. Do not invent a heat-content conversion.
+- Do not duplicate water usage across sewer/stormwater service subtotals.
+- Preserve actual zero consumption as 0. Missing or ambiguous consumption is null.
 
 UTILITY BILL TEXT:
 """
@@ -183,6 +196,10 @@ def _clean_bill(bill: dict) -> dict:
             except (TypeError, ValueError):
                 bill[field] = None
 
+    if bill["total_amount"] is not None and not math.isfinite(bill["total_amount"]):
+        bill["total_amount"] = None
+    util = {"electricity": "electric", "natural gas": "gas"}.get(bill.get("utility_type"), bill.get("utility_type"))
+    bill["usage_quantity"], bill["usage_unit"] = normalize_usage(bill.get("usage_quantity"), bill.get("usage_unit"), util)
     return bill
 
 
