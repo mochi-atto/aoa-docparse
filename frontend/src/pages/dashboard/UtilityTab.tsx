@@ -326,6 +326,7 @@ export function EditableCell({ canEdit = false, value, rawValue, field, billId, 
       return (
         <div className="flex items-center gap-1">
           <select disabled={!canEdit} value={editingBill.value} onChange={(e) => { editUtilityBill(billId, { [field]: e.target.value }); setEditingBill(null); }}
+            aria-label={`Select ${field}`}
             autoFocus className="border border-stone-300 rounded px-1 py-0.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-stone-400">
             {UTIL_TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
           </select>
@@ -336,9 +337,11 @@ export function EditableCell({ canEdit = false, value, rawValue, field, billId, 
       <div className="flex items-center gap-1">
         <input value={editingBill.value} onChange={(e) => setEditingBill({ ...editingBill, value: e.target.value })}
           type={type === "date" ? "date" : "text"} autoFocus
+          aria-label={`Edit ${field}`}
           onKeyDown={(e) => { if (e.key === "Enter") { editUtilityBill(billId, { [field]: editingBill.value }); setEditingBill(null); } if (e.key === "Escape") setEditingBill(null); }}
           className="border border-stone-300 rounded px-1.5 py-0.5 text-xs w-full focus:outline-none focus:ring-1 focus:ring-stone-400 font-mono" />
         <button onClick={() => { editUtilityBill(billId, { [field]: editingBill.value }); setEditingBill(null); }}
+          aria-label={`Save ${field}`}
           className="text-emerald-600 text-xs flex-shrink-0">✓</button>
       </div>
     );

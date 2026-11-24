@@ -18,11 +18,11 @@ export function DashboardTab({ canEdit, utilities, todos, utilMonthly, allMonths
             <h3 onClick={() => setActiveTab("risks")} className="text-base font-semibold text-stone-800 cursor-pointer hover:text-blue-700 transition-colors" style={{ fontFamily: "'Fraunces', serif" }}>Active Risks & Backlog →</h3>
             <div className="flex items-center gap-1.5">
               {PRIO_ORDER.map((p) => (
-                <span key={p} title={PRIORITY[p].desc} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-help ${PRIORITY[p].badge}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY[p].dot}`} />{prioCounts[p]}
+                <span key={p} title={PRIORITY[p].desc} aria-label={`${PRIORITY[p].label}: ${prioCounts[p]} tasks`} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-help ${PRIORITY[p].badge}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY[p].dot}`} aria-hidden="true" />{prioCounts[p]}
                 </span>
               ))}
-              <button disabled={!canEdit} onClick={() => setShowAddTask(true)} className="ml-2 text-xs text-stone-500 hover:text-stone-800 font-medium">+ Add</button>
+              <button disabled={!canEdit} onClick={() => setShowAddTask(true)} aria-label="Add new task" className="ml-2 text-xs text-stone-600 hover:text-stone-900 font-medium">+ Add</button>
             </div>
           </div>
 
@@ -35,11 +35,11 @@ export function DashboardTab({ canEdit, utilities, todos, utilMonthly, allMonths
                 const c = PRIORITY[todo.priority as keyof typeof PRIORITY];
                 return (
                   <div key={todo.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${c.border} ${c.bg}`}>
-                    <button disabled={!canEdit} onClick={() => toggleTodo(todo.id)} className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${todo.done ? "bg-sky-500 border-sky-500 text-white" : "border-stone-300 hover:border-stone-400"}`}>
+                    <button disabled={!canEdit} onClick={() => toggleTodo(todo.id)} aria-label={todo.done ? `Mark "${todo.text}" incomplete` : `Mark "${todo.text}" addressed`} className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${todo.done ? "bg-sky-500 border-sky-500 text-white" : "border-stone-300 hover:border-stone-400"}`}>
                       {todo.done && <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                     </button>
-                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${c.dot}`} />
-                    <span className={`flex-1 text-sm ${todo.done ? "line-through text-stone-400" : "text-stone-700"}`}>{todo.text}</span>
+                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${c.dot}`} aria-hidden="true" />
+                    <span className={`flex-1 text-sm ${todo.done ? "line-through text-stone-500" : "text-stone-700"}`}>{todo.text}</span>
                     {(() => {
                       const linked: WorkOrder[] = workOrders.filter((wo: WorkOrder) => wo.todo_id === todo.id);
                       const extra = linked.length - MAX_TASK_WO_CHIPS;

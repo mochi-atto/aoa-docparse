@@ -11,21 +11,21 @@ export default function LoginPage() {
   }, [isAuthenticated, navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
+    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
       <div className="bg-white rounded-xl shadow-lg p-10 max-w-md w-full text-center">
         <h1 className="text-3xl font-bold text-slate-800 mb-2">
           Parish Document Parser
         </h1>
-        <p className="text-slate-500 mb-8">
+        <p className="text-slate-600 mb-8">
           Upload and analyze utility bills and property appraisals
         </p>
         <button
           onClick={() => loginWithRedirect()}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
         >
           Sign In
         </button>
       </div>
-    </div>
+    </main>
   );
 }

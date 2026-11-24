@@ -613,9 +613,9 @@ export default function DashboardPage() {
             <h1 className="text-lg font-semibold text-stone-800" style={{ fontFamily: "'Fraunces', serif" }}>Dashboard</h1>
           </div>
           <div className="relative" ref={menuRef}>
-            <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex items-center gap-2 hover:bg-stone-50 rounded-lg px-2 py-1.5 transition-colors">
+            <button onClick={() => setUserMenuOpen(!userMenuOpen)} aria-label="User account menu" aria-expanded={userMenuOpen} className="flex items-center gap-2 hover:bg-stone-50 rounded-lg px-2 py-1.5 transition-colors">
               <div className="w-8 h-8 rounded-full bg-stone-200 flex items-center justify-center text-sm font-medium overflow-hidden">
-                {avatar ? <img src={avatar} alt="" className="w-full h-full object-cover" /> : displayName[0].toUpperCase()}
+                {avatar ? <img src={avatar} alt="User profile photo" className="w-full h-full object-cover" /> : displayName[0].toUpperCase()}
               </div>
               <svg className="w-4 h-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
@@ -638,32 +638,35 @@ export default function DashboardPage() {
             <div className="p-5 flex items-center gap-5">
               <label className="flex-shrink-0 cursor-pointer group relative">
                 <div className="w-20 h-20 rounded-xl bg-stone-100 overflow-hidden border-2 border-stone-200 flex items-center justify-center">
-                  {parishImage ? <img src={parishImage} alt="" className="w-full h-full object-cover" /> : <svg className="w-8 h-8 text-stone-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>}
+                  {parishImage ? <img src={parishImage} alt={`${parish?.name || "Parish"} photo`} className="w-full h-full object-cover" /> : <svg className="w-8 h-8 text-stone-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg>}
                 </div>
                 <div className="absolute inset-0 rounded-xl bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                   <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 </div>
-                <input type="file" accept="image/*" className="hidden" disabled={!isAdmin} onChange={handleImageUpload} />
+                <input type="file" accept="image/*" className="hidden" disabled={!isAdmin} aria-label="Upload parish image" onChange={handleImageUpload} />
               </label>
               <div className="flex-1 min-w-0">
                 {editingName ? (
                   <div className="flex items-center gap-2">
                     <input value={nameInput} onChange={(e) => setNameInput(e.target.value)} autoFocus onKeyDown={(e) => e.key === "Enter" && saveParishName()}
+                      aria-label="Edit parish name"
                       className="text-xl font-bold text-stone-800 border border-stone-300 rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-stone-400" style={{ fontFamily: "'Fraunces', serif" }} />
                     <button onClick={saveParishName} className="text-emerald-600 text-sm font-medium">Save</button>
-                    <button onClick={() => setEditingName(false)} className="text-stone-400 text-sm">Cancel</button>
+                    <button onClick={() => setEditingName(false)} className="text-stone-500 hover:text-stone-700 text-sm">Cancel</button>
                   </div>
                 ) : (
                   <h2 onClick={() => { if (!isAdmin) return; setEditingName(true); setNameInput(parish?.name || ""); }} className="text-xl font-bold text-stone-800 truncate cursor-pointer hover:text-stone-600 transition-colors" style={{ fontFamily: "'Fraunces', serif" }} title="Click to rename">
                     {parish?.name || "Untitled Parish"}
                   </h2>
                 )}
-                <p className="text-sm text-stone-400 mt-0.5">{parish?.diocese}{parish?.address ? ` · ${parish.address}` : ""}</p>
+                <p className="text-sm text-stone-600 mt-0.5">{parish?.diocese}{parish?.address ? ` · ${parish.address}` : ""}</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-stone-400">{buildings.length} building{buildings.length !== 1 ? "s" : ""}</span>
+                  <span className="text-xs text-stone-600 font-medium">{buildings.length} building{buildings.length !== 1 ? "s" : ""}</span>
                   <button disabled={!isAdmin} onClick={() => setShowAddBuilding(true)}
                     className="bg-blue-600 hover:bg-blue-700 disabled:bg-stone-300 text-white px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm">+ Add building</button>
                   <button disabled={!isAdmin} onClick={() => setShowBuildingMgmt(!showBuildingMgmt)}
+                    aria-expanded={showBuildingMgmt}
+                    aria-label="Manage buildings list"
                     className="text-xs text-blue-600 hover:text-blue-700 font-medium">
                     {showBuildingMgmt ? "Close ▴" : "Manage ▾"}
                   </button>
@@ -711,23 +714,24 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-2 flex-1">
                           <input value={renamingBuilding.name} onChange={(e) => setRenamingBuilding({ ...renamingBuilding, name: e.target.value })}
                             autoFocus onKeyDown={(e) => e.key === "Enter" && renameBuilding()}
+                            aria-label={`Rename building ${b.name}`}
                             className="flex-1 border border-stone-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-stone-400" />
                           <button onClick={renameBuilding} className="text-emerald-600 text-xs font-medium">Save</button>
-                          <button onClick={() => setRenamingBuilding(null)} className="text-stone-400 text-xs">Cancel</button>
+                          <button onClick={() => setRenamingBuilding(null)} className="text-stone-500 hover:text-stone-700 text-xs">Cancel</button>
                         </div>
                       ) : (
                         <>
                           <button onClick={() => setRenamingBuilding({ id: b.id, name: b.name })} className="text-sm text-stone-700 hover:text-blue-600 transition-colors" title="Click to rename">{b.name}</button>
                           {confirmDeleteBuilding === b.id ? (
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-red-600">Remove?</span>
-                              <button onClick={() => removeBuilding(b.id)} className="text-xs bg-red-600 text-white px-2 py-0.5 rounded font-medium">Yes</button>
-                              <button onClick={() => setConfirmDeleteBuilding(null)} className="text-xs text-stone-400">No</button>
+                              <span className="text-xs text-red-600 font-medium">Remove?</span>
+                              <button onClick={() => removeBuilding(b.id)} aria-label={`Confirm remove building ${b.name}`} className="text-xs bg-red-600 text-white px-2 py-0.5 rounded font-medium">Yes</button>
+                              <button onClick={() => setConfirmDeleteBuilding(null)} className="text-xs text-stone-500">No</button>
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <button onClick={() => setRenamingBuilding({ id: b.id, name: b.name })} className="text-xs text-stone-400 hover:text-stone-600">Rename</button>
-                              <button onClick={() => setConfirmDeleteBuilding(b.id)} className="text-xs text-stone-400 hover:text-red-500">Remove</button>
+                              <button onClick={() => setRenamingBuilding({ id: b.id, name: b.name })} aria-label={`Rename building ${b.name}`} className="text-xs text-stone-500 hover:text-stone-700">Rename</button>
+                              <button onClick={() => setConfirmDeleteBuilding(b.id)} aria-label={`Remove building ${b.name}`} className="text-xs text-stone-500 hover:text-red-600">Remove</button>
                             </div>
                           )}
                         </>
@@ -751,10 +755,10 @@ export default function DashboardPage() {
                     </button>
                   ))}
                 </div>
-                <label className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors bg-white border border-stone-300 text-stone-700 hover:bg-stone-50">
-                  + Add Files
+                <label className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 focus-within:ring-2 focus-within:ring-stone-400">
+                  Upload
                   <input ref={fileRef} type="file" accept=".pdf" multiple className="hidden" onChange={handleFilesSelected}
-                    disabled={uploading} />
+                    disabled={uploading} aria-label="Upload PDF files" />
                 </label>
                 {stagedFiles.length > 0 && !uploading && (
                   <button onClick={parseAndUpload} className="bg-stone-800 hover:bg-stone-900 text-white px-4 py-1.5 rounded-lg text-xs font-medium transition-colors">
@@ -798,21 +802,33 @@ export default function DashboardPage() {
             </div>}
 
             {/* Tabs */}
-            <div className="border-t border-stone-100 px-5 flex gap-0 overflow-x-auto">
-              {TABS.map((tab) => (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                    activeTab === tab.key ? "text-stone-800 border-stone-800" : "text-stone-500 border-transparent hover:text-stone-700 hover:border-stone-300"
-                  }`}>
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            <nav role="tablist" aria-label="Dashboard views" className="border-t border-stone-200/80 px-5 py-2.5 flex items-center gap-1.5 overflow-x-auto bg-stone-50/70">
+              {TABS.map((tab) => {
+                const isActive = activeTab === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    role="tab"
+                    aria-selected={isActive}
+                    id={`tab-${tab.key}`}
+                    aria-controls={`panel-${tab.key}`}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`px-4 py-2 text-base rounded-lg transition-all whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 ${
+                      isActive
+                        ? "bg-stone-800 text-white font-semibold shadow-sm"
+                        : "text-stone-700 hover:text-stone-900 hover:bg-stone-200/70 font-medium"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
         </div>
 
         {/* ═══ Tab Content ═══ */}
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div id={`panel-${activeTab}`} role="tabpanel" aria-labelledby={`tab-${activeTab}`} className="max-w-7xl mx-auto px-6 py-4">
           {activeTab === "dashboard" && <DashboardTab canEdit={canEdit}
             utilities={utilities} todos={todos}
             utilMonthly={utilMonthly} allMonths={allMonths} buildingVals={buildingVals}
@@ -852,7 +868,7 @@ export default function DashboardPage() {
           toast.type === "error" ? "bg-red-50 border-red-200 text-red-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"
         }`}>
           <span>{toast.msg}</span>
-          <button onClick={() => setToast(null)} className="text-current opacity-50 hover:opacity-100">✕</button>
+          <button onClick={() => setToast(null)} aria-label="Close notification" className="text-current opacity-50 hover:opacity-100">✕</button>
         </div>
       )}
 

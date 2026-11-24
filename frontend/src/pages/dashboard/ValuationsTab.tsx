@@ -153,9 +153,10 @@ export function ValuationsTab({ canEdit, buildingVals, totalVal, totalValPct, ap
                       {isEditingThis("building_value") ? (
                         <div className="flex items-center gap-1">
                           <input value={editingVal!.value} onChange={(e) => setEditingVal({ ...editingVal!, value: e.target.value })}
+                            aria-label="Building value"
                             autoFocus onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditingVal(null); }}
                             className="border border-stone-300 rounded px-1.5 py-0.5 text-xs w-full font-mono" />
-                          <button onClick={saveEdit} className="text-emerald-600 text-xs">✓</button>
+                          <button onClick={saveEdit} aria-label="Save building value" className="text-emerald-600 text-xs">✓</button>
                         </div>
                       ) : (
                         <span onClick={() => startEdit("building_value", String(h.value || ""))}
@@ -164,9 +165,10 @@ export function ValuationsTab({ canEdit, buildingVals, totalVal, totalValPct, ap
                       {isEditingThis("gross_sq_ft") ? (
                         <div className="flex items-center gap-1">
                           <input value={editingVal!.value} onChange={(e) => setEditingVal({ ...editingVal!, value: e.target.value })}
+                            aria-label="Gross square feet"
                             autoFocus onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditingVal(null); }}
                             className="border border-stone-300 rounded px-1.5 py-0.5 text-xs w-full font-mono" />
-                          <button onClick={saveEdit} className="text-emerald-600 text-xs">✓</button>
+                          <button onClick={saveEdit} aria-label="Save gross square feet" className="text-emerald-600 text-xs">✓</button>
                         </div>
                       ) : (
                         <span onClick={() => startEdit("gross_sq_ft", String(h.sqft || ""))}

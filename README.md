@@ -184,7 +184,7 @@ Open `http://localhost:5173`.
 ### Uploading Utility Bills
 
 1. On the dashboard, select **"Utility"** in the upload bar
-2. Click **"+ Add Files"** and select one or more PDF bills
+2. Click **"Upload"** and select one or more PDF bills
 3. Click **"Parse & Upload"** — the LLM extracts data from each bill
 4. Bills appear on the Utility tab grouped by building/account
 

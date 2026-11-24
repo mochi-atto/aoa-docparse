@@ -142,6 +142,7 @@ export default function ParishSelectPage() {
                     onClick={(e) => openDeleteModal(p, e)}
                     className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity text-stone-300 hover:text-red-500 p-1 rounded"
                     title="Delete parish"
+                    aria-label={`Delete parish ${p.name}`}
                   >
                     ✕
                   </button>
@@ -149,8 +150,8 @@ export default function ParishSelectPage() {
               ))}
               {parishes.length === 0 && (
                 <div className="text-center py-12 bg-white rounded-xl border border-stone-200">
-                  <p className="text-stone-400 mb-2">No parishes yet.</p>
-                  <p className="text-sm text-stone-300">Create one to get started.</p>
+                  <p className="text-stone-500 mb-2">No parishes yet.</p>
+                  <p className="text-sm text-stone-400">Create one to get started.</p>
                 </div>
               )}
             </div>
@@ -168,26 +169,27 @@ export default function ParishSelectPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-medium text-stone-500 block mb-1">Parish Name *</label>
-                  <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g., St. Mary's Catholic Church"
+                  <label htmlFor="new-parish-name" className="text-xs font-medium text-stone-700 block mb-1">Parish Name *</label>
+                  <input id="new-parish-name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g., St. Mary's Catholic Church"
                     className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-400" />
                 </div>
 
                 {/* Buildings */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-medium text-stone-500">Buildings *</label>
+                    <label className="text-xs font-medium text-stone-700">Buildings *</label>
                     <button onClick={addBuildingInput} className="text-xs text-blue-600 hover:text-blue-700 font-medium">+ Add another</button>
                   </div>
-                  <p className="text-xs text-stone-400 mb-2">List each building on the property (church, rectory, school, hall, etc.)</p>
+                  <p className="text-xs text-stone-500 mb-2">List each building on the property (church, rectory, school, hall, etc.)</p>
                   <div className="space-y-2">
                     {newBuildings.map((b, i) => (
                       <div key={i} className="flex items-center gap-2">
                         <input value={b} onChange={(e) => updateBuildingInput(i, e.target.value)}
                           placeholder={i === 0 ? "e.g., Main Church" : `Building ${i + 1}`}
+                          aria-label={`Building ${i + 1} name`}
                           className="flex-1 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-400" />
                         {newBuildings.length > 1 && (
-                          <button onClick={() => removeBuildingInput(i)} className="text-stone-400 hover:text-red-500 text-sm px-1">✕</button>
+                          <button onClick={() => removeBuildingInput(i)} aria-label={`Remove building input ${i + 1}`} className="text-stone-400 hover:text-red-500 text-sm px-1">✕</button>
                         )}
                       </div>
                     ))}
@@ -202,7 +204,7 @@ export default function ParishSelectPage() {
                     {creating ? "Creating…" : "Create Parish"}
                   </button>
                   <button onClick={() => { setShowCreate(false); setError(""); }}
-                    className="px-4 py-2.5 text-sm text-stone-500 hover:text-stone-700 transition-colors">Cancel</button>
+                    className="px-4 py-2.5 text-sm text-stone-600 hover:text-stone-800 transition-colors">Cancel</button>
                 </div>
               </div>
             </div>
@@ -213,18 +215,19 @@ export default function ParishSelectPage() {
     {/* Delete confirmation modal */}
     {deleteTarget && (
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={closeDeleteModal}>
-        <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-          <h2 className="text-lg font-semibold text-stone-800 mb-1" style={{ fontFamily: "'Fraunces', serif" }}>Delete Parish</h2>
-          <p className="text-sm text-stone-500 mb-4">
-            This will permanently delete <span className="font-medium text-stone-700">{deleteTarget.name}</span> and all of its data. This action cannot be undone.
+        <div role="dialog" aria-modal="true" aria-labelledby="delete-parish-title" className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          <h2 id="delete-parish-title" className="text-lg font-semibold text-stone-800 mb-1" style={{ fontFamily: "'Fraunces', serif" }}>Delete Parish</h2>
+          <p className="text-sm text-stone-600 mb-4">
+            This will permanently delete <span className="font-medium text-stone-800">{deleteTarget.name}</span> and all of its data. This action cannot be undone.
           </p>
-          <p className="text-xs font-medium text-stone-500 mb-2">
-            Type <span className="font-mono bg-stone-100 px-1 py-0.5 rounded text-stone-700">{deleteTarget.name}</span> to confirm
+          <p className="text-xs font-medium text-stone-600 mb-2">
+            Type <span className="font-mono bg-stone-100 px-1 py-0.5 rounded text-stone-800">{deleteTarget.name}</span> to confirm
           </p>
           <input
             value={deleteConfirmText}
             onChange={(e) => setDeleteConfirmText(e.target.value)}
             placeholder={deleteTarget.name}
+            aria-label={`Confirm deletion by typing ${deleteTarget.name}`}
             className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 mb-3"
             autoFocus
           />
