@@ -170,9 +170,9 @@ def _clean_bill(bill: dict) -> dict:
 
     # Ensure total_amount is a float
     try:
-        bill["total_amount"] = float(bill.get("total_amount", 0))
+        bill["total_amount"] = float(bill.get("total_amount"))
     except (TypeError, ValueError):
-        bill["total_amount"] = 0.0
+        bill["total_amount"] = None
 
     # Ensure numeric fields
     for field in ["usage_quantity", "rate"]:
@@ -249,11 +249,11 @@ def parse_utility_bill(pdf_path: str, extracted_text: Optional[str] = None) -> l
             for bill in bills:
                 cleaned = _clean_bill(bill)
                 # Only keep bills that have at least a date and amount
-                if cleaned.get("bill_date") and cleaned.get("total_amount", 0) > 0:
+                if cleaned.get("bill_date") and cleaned.get("total_amount") is not None:
                     all_bills.append(cleaned)
         except Exception as e:
             print(f"[Parser] Error on chunk {i + 1}: {type(e).__name__}")
-            continue
+            raise RuntimeError("Utility parsing failed; retry the document or enter the bill manually") from e
 
     # Deduplicate in case overlapping pages produced the same bill
     unique_bills = _deduplicate_bills(all_bills)

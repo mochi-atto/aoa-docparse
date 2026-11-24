@@ -56,6 +56,7 @@ export default function DashboardPage() {
   const [uploadProgress, setUploadProgress] = useState<Record<string, { status: "pending" | "parsing" | "done" | "error"; progress: number; msg?: string }>>({});
   const [uploadMsg, setUploadMsg] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const uploadKeys = useRef(new WeakMap<File, string>());
 
   // Todos & History — loaded from API
   const [todos, setTodos] = useState<TodoItem[]>([]);
@@ -143,17 +144,6 @@ export default function DashboardPage() {
   }, [parishId, getAccessTokenSilently]);
 
   useEffect(() => { refreshData(); }, [refreshData]);
-
-  // ── History helper (API-backed) ──
-  const addHistory = useCallback(async (type: string, description: string) => {
-    try {
-      const token = await getAccessTokenSilently();
-      setAuthToken(token);
-      const res = await api.post(`/parishes/${parishId}/history`, { entry_type: type, description });
-      const h = res.data;
-      setHistory((prev) => [{ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name }, ...prev]);
-    } catch { /* silent */ }
-  }, [parishId, getAccessTokenSilently]);
 
   const refreshHistory = useCallback(async () => {
     try {
@@ -277,6 +267,7 @@ export default function DashboardPage() {
       setAuthToken(token);
 
       let successCount = 0;
+      const failedFiles: File[] = [];
       for (let i = 0; i < stagedFiles.length; i++) {
         const file = stagedFiles[i];
         progress[file.name] = { status: "parsing", progress: 30 };
@@ -293,22 +284,19 @@ export default function DashboardPage() {
           form.append("parish_id", parishId);
           form.append("doc_type", uploadType);
           form.append("extracted_text", utilityText);
+          if (!uploadKeys.current.has(file)) uploadKeys.current.set(file, crypto.randomUUID());
+          form.append("upload_key", uploadKeys.current.get(file)!);
 
-          // Simulated progress stages
-          const progressInterval = setInterval(() => {
-            progress[file.name] = { ...progress[file.name], progress: Math.min(90, progress[file.name].progress + 10) };
-            setUploadProgress({ ...progress });
-          }, 500);
+          const result = await api.post("/upload/", form);
+          if (!result.data.success) throw new Error(result.data.message || "No bills extracted");
 
-          await api.post("/upload/", form, { headers: { "Content-Type": "multipart/form-data" } });
-
-          clearInterval(progressInterval);
           progress[file.name] = { status: "done", progress: 100, msg: "Success" };
           setUploadProgress({ ...progress });
-          addHistory("upload", `Uploaded ${uploadType} document: ${file.name}`);
+
           successCount++;
         } catch (err) {
-          progress[file.name] = { status: "error", progress: 100, msg: errorDetail(err) || "Failed" };
+          failedFiles.push(file);
+          progress[file.name] = { status: "error", progress: 100, msg: errorDetail(err) || (err instanceof Error ? err.message : "Failed") };
           setUploadProgress({ ...progress });
         }
       }
@@ -323,9 +311,10 @@ export default function DashboardPage() {
       setAppraisals(aRes.data);
       setHistory(hRes.data.map((h: { id: number; entry_type: string; description: string; created_at: string; undone?: string; user_email?: string; user_name?: string }) => ({ id: h.id, type: h.entry_type, description: h.description, date: h.created_at, undone: h.undone, user_email: h.user_email, user_name: h.user_name })));
       setUploadMsg(`${successCount}/${stagedFiles.length} files uploaded successfully`);
-      setStagedFiles([]);
+      setStagedFiles(failedFiles);
+      if (successCount > 0) setActiveTab("utility");
     } catch {
-      setUploadMsg("Upload batch failed");
+      setUploadMsg("Upload or list refresh failed. Retry safely, or reload to check saved bills.");
     } finally {
       setUploading(false);
     }
@@ -772,7 +761,7 @@ export default function DashboardPage() {
                     {uploadType === "appraisal" ? `Enter Data (${stagedFiles.length})` : `Parse & Upload (${stagedFiles.length})`}
                   </button>
                 )}
-                {uploadMsg && <span className={`text-xs ${uploadMsg.includes("success") ? "text-emerald-600" : "text-red-500"}`}>{uploadMsg}</span>}
+                {uploadMsg && <span className={`text-xs ${uploadMsg.includes("success") && !uploadMsg.startsWith("0/") ? "text-emerald-600" : "text-red-500"}`}>{uploadMsg}</span>}
               </div>
 
               {/* Staged files list */}
@@ -783,7 +772,10 @@ export default function DashboardPage() {
                     return (
                       <div key={`${f.name}-${i}`} className="flex items-center gap-2 bg-white rounded-lg border border-stone-200 px-3 py-2">
                         <svg className="w-4 h-4 text-stone-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                        <span className="text-xs text-stone-700 flex-1 truncate">{f.name}</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs text-stone-700 truncate block">{f.name}</span>
+                          {prog?.status === "error" && prog.msg && <p role="alert" className="text-xs text-red-600">{prog.msg}</p>}
+                        </div>
 
                         {prog ? (
                           <div className="flex items-center gap-2 flex-shrink-0">

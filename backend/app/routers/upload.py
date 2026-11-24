@@ -9,6 +9,9 @@ from app.parsers.appraisal_parser import parse_appraisal
 from app.models.utility_bill import UtilityBill
 from app.models.appraisal import Appraisal
 from app.models.history_entry import HistoryEntry
+from app.models.utility_upload import UtilityUpload
+from sqlalchemy.exc import IntegrityError
+import hashlib
 import tempfile
 import os
 
@@ -26,11 +29,12 @@ def upload_admin_access(parish_id: int = Form(...), account=Depends(current_acco
 
 
 @router.post("/", response_model=UploadResponse)
-async def upload_document(
+def upload_document(
     file: UploadFile = File(...),
     parish_id: int = Form(...),
     doc_type: str = Form(...),  # "utility" or "appraisal"
     extracted_text: str | None = Form(None),
+    upload_key: str | None = Form(None, max_length=100),
     db: Session = Depends(get_db),
     membership=Depends(upload_admin_access),
 ):
@@ -40,11 +44,27 @@ async def upload_document(
     if doc_type not in ("utility", "appraisal"):
         raise HTTPException(status_code=400, detail="doc_type must be 'utility' or 'appraisal'")
 
-    content = await file.read(MAX_PDF_BYTES + 1)
+    content = file.file.read(MAX_PDF_BYTES + 1)
     if len(content) > MAX_PDF_BYTES:
         raise HTTPException(status_code=413, detail="PDF exceeds the 25 MB limit")
     if not content.startswith(b"%PDF-"):
         raise HTTPException(status_code=400, detail="The uploaded file is not a PDF")
+
+    # A sync endpoint uses FastAPI's bounded worker pool for the synchronous
+    # parser and ORM. Do not hold an auth transaction during external API waits.
+    actor_sub = membership.account.auth0_sub
+    db.rollback()
+    fingerprint = hashlib.sha256(content + (extracted_text or "").encode()).hexdigest()
+    def prior_response():
+        prior = db.query(UtilityUpload).filter_by(parish_id=parish_id, upload_key=upload_key).first()
+        if prior and prior.fingerprint != fingerprint:
+            raise HTTPException(409, "Upload key already used for a different document")
+        return prior.response if prior else None
+    if doc_type == "utility" and upload_key:
+        prior = prior_response()
+        if prior:
+            return prior
+        db.rollback()
 
     # Save to temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
@@ -54,7 +74,11 @@ async def upload_document(
     try:
         if doc_type == "utility":
             # Parser now returns a LIST of bills
-            bills = parse_utility_bill(tmp_path, extracted_text=extracted_text)
+            try:
+                bills = parse_utility_bill(tmp_path, extracted_text=extracted_text)
+            except Exception:
+                db.rollback()
+                raise HTTPException(502, "Utility parsing failed. Retry or enter the bill manually.") from None
 
             if not bills:
                 return UploadResponse(
@@ -94,9 +118,8 @@ async def upload_document(
             db.add(HistoryEntry(
                 parish_id=parish_id, entry_type="upload",
                 description=f"Utility upload: {file.filename} ({records_created} records)",
-                snapshot={"actor_sub": membership.account.auth0_sub},
+                snapshot={"actor_sub": actor_sub},
             ))
-            db.commit()
 
             # Build a descriptive message
             if records_created == 1:
@@ -125,7 +148,7 @@ async def upload_document(
                     f"— total: ${total_sum:,.2f}"
                 )
 
-            return UploadResponse(
+            response = UploadResponse(
                 success=True,
                 message=message,
                 extracted_data={
@@ -133,6 +156,20 @@ async def upload_document(
                     "bills": all_extracted,
                 },
             )
+
+            if upload_key:
+                db.add(UtilityUpload(parish_id=parish_id, upload_key=upload_key,
+                    fingerprint=fingerprint, response=response.model_dump(mode="json")))
+            try:
+                db.commit()
+            except IntegrityError:
+                db.rollback()
+                if upload_key:
+                    prior = prior_response()
+                    if prior:
+                        return prior
+                raise
+            return response
 
         else:  # appraisal: local PDF parsing only; never sent to an AI service
             # Fetch the active template (default first, then any)
@@ -187,7 +224,7 @@ async def upload_document(
             db.add(HistoryEntry(
                 parish_id=parish_id, entry_type="upload",
                 description=f"Appraisal upload: {file.filename}",
-                snapshot={"actor_sub": membership.account.auth0_sub},
+                snapshot={"actor_sub": actor_sub},
             ))
             db.commit()
 
