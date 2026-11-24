@@ -24,6 +24,8 @@ def pending(connection):
         changes.append("ALTER TABLE work_orders ADD COLUMN todo_id INTEGER REFERENCES todos(id) ON DELETE SET NULL")
     if "work_orders" in tables and "status_before_hold" not in {c["name"] for c in schema.get_columns("work_orders")}:
         changes.append("ALTER TABLE work_orders ADD COLUMN status_before_hold VARCHAR")
+    if "work_orders" in tables and "asset_id" not in {c["name"] for c in schema.get_columns("work_orders")}:
+        changes.append("ALTER TABLE work_orders ADD COLUMN asset_id INTEGER REFERENCES assets(id) ON DELETE SET NULL")
     if "extraction_templates" in tables and "parish_id" not in {c["name"] for c in schema.get_columns("extraction_templates")}:
         changes.append("ALTER TABLE extraction_templates ADD COLUMN parish_id INTEGER REFERENCES parishes(id)")
     if "assets" in tables:

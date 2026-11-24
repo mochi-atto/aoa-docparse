@@ -13,6 +13,7 @@ from app.models.todo import Todo
 from app.models.user_profile import UserProfile
 from app.models.history_entry import HistoryEntry
 from app.permissions import CurrentUser, get_current_user
+from app.models.asset import Asset
 from app.models.work_order_note import WorkOrderNote
 
 router = APIRouter()
@@ -98,6 +99,7 @@ class WorkOrderCreate(BaseModel):
     due_date: Optional[datetime.date] = None
     building_id: Optional[int] = None
     todo_id: Optional[int] = None
+    asset_id: Optional[int] = None
     requester_name: Optional[str] = None
 
 class WorkOrderResponse(BaseModel):
@@ -106,6 +108,7 @@ class WorkOrderResponse(BaseModel):
     display_number: str
     building_id: Optional[int]
     todo_id: Optional[int]
+    asset_id: Optional[int]
 
     title: str
     description: Optional[str]
@@ -180,6 +183,15 @@ def create_work_order(
         )
         if todo is None:
             raise HTTPException(status_code=400, detail="Invalid todo_id for this parish")
+    
+    if data.asset_id is not None:
+        asset = (
+            db.query(Asset)
+            .filter(Asset.id == data.asset_id, Asset.parish_id == parish_id)
+            .first()
+        )
+        if asset is None:
+            raise HTTPException(status_code=400, detail="Invalid asset_id for this parish")
 
     if data.due_date is not None:
         due_date = data.due_date
@@ -198,6 +210,7 @@ def create_work_order(
         display_number=display_number,
         building_id=data.building_id,
         todo_id=data.todo_id,
+        asset_id=data.asset_id,
         title=title,
         description=data.description,
         priority=data.priority,

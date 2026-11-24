@@ -1,6 +1,8 @@
 import WorkOrderActions from "./WorkOrderActions";
 import type { DashboardViewProps } from "./viewTypes";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import api from "../../services/api";
+import type { AssetOption } from "./types";
 import type { WorkOrder } from "./types";
 import { PRIORITY, PRIO_ORDER, WO_PRIORITY_BADGE, WO_STATUS_LABEL } from "./constants";
 import { fmtDate, sortByPriority } from "./helpers";
@@ -16,6 +18,14 @@ export function RisksTab({ parishId, role, subject, transitionOrder, canEdit, ca
     workOrders.forEach((wo: WorkOrder) => { if (wo.todo_id != null) (m[wo.todo_id] ||= []).push(wo); });
     return m;
   }, [workOrders]);
+
+  const [assets, setAssets] = useState<AssetOption[]>([]);
+  useEffect(() => {
+    if (parishId == null) return;
+    api.get<AssetOption[]>(`/parishes/${parishId}/assets`)
+      .then((res) => setAssets(res.data))
+      .catch(() => setAssets([]));
+  }, [parishId]);
 
   return (
     <div>
@@ -71,7 +81,7 @@ export function RisksTab({ parishId, role, subject, transitionOrder, canEdit, ca
                   </div>
                   {woFormFor === todo.id && (
                     <div className="px-5 py-3 bg-stone-50">
-                      <WorkOrderForm todo={todo} buildings={buildings} createWorkOrder={createWorkOrder} onDone={() => setWoFormFor(null)} />
+                      <WorkOrderForm todo={todo} buildings={buildings} assets={assets} createWorkOrder={createWorkOrder} onDone={() => setWoFormFor(null)} />
                     </div>
                   )}
                   </div>
@@ -87,20 +97,20 @@ export function RisksTab({ parishId, role, subject, transitionOrder, canEdit, ca
         <h3 className="text-base font-semibold text-stone-800" style={{ fontFamily: "'Fraunces', serif" }}>Work Orders</h3>
         <button disabled={!canEdit} onClick={() => setWoFormFor(woFormFor === "new" ? null : "new")} className="bg-stone-800 hover:bg-stone-900 text-white px-4 py-2 rounded-lg text-sm font-medium">+ New Work Order</button>
       </div>
-      {woFormFor === "new" && <div className="mb-4"><WorkOrderForm buildings={buildings} createWorkOrder={createWorkOrder} onDone={() => setWoFormFor(null)} /></div>}
+      {woFormFor === "new" && <div className="mb-4"><WorkOrderForm buildings={buildings} assets={assets} createWorkOrder={createWorkOrder} onDone={() => setWoFormFor(null)} /></div>}
       {workOrders.length === 0 ? <div className="bg-white rounded-xl border border-stone-200 p-12 text-center"><p className="text-stone-400">No work orders yet.</p></div> : (
         <div className="bg-white rounded-xl border border-stone-200 overflow-hidden divide-y divide-stone-100">
           {workOrders.map((wo: WorkOrder) => {
             const building = buildings?.find((b) => b.id === wo.building_id);
             const todo = wo.todo_id != null ? todos.find((t) => t.id === wo.todo_id) : null;
+            const asset = assets.find((a) => a.id === wo.asset_id);
             return (
               <div key={wo.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 <span className="text-xs font-semibold text-stone-500 tabular-nums w-16 flex-shrink-0">{wo.display_number}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-stone-700 truncate">{wo.title}</p>
                   <p className="text-xs text-stone-400 truncate">
-                    {[building?.name, todo && `Task: ${todo.text}`, wo.requester_name && `Requested by ${wo.requester_name}`].filter(Boolean).join(" · ")}
-                  </p>
+                    {[building?.name, asset && `Asset: ${asset.name}`, todo && `Task: ${todo.text}`, wo.requester_name && `Requested by ${wo.requester_name}`].filter(Boolean).join(" · ")}                  </p>
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${WO_PRIORITY_BADGE[wo.priority] || ""}`}>{wo.priority}</span>
                 <WorkOrderActions order={wo} role={role} subject={subject} transition={transitionOrder} />

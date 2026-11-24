@@ -1,9 +1,9 @@
 import type { WorkOrderInput } from "./viewTypes";
 import { useState } from "react";
-import type { BuildingData, TodoItem, WorkOrderPriority } from "./types";
+import type { AssetOption, BuildingData, TodoItem, WorkOrderPriority } from "./types";
 import { WO_PRIORITIES, WO_PRIORITY_BADGE, TODO_TO_WO_PRIORITY } from "./constants";
 
-export function WorkOrderForm({ todo, buildings, createWorkOrder, onDone }: { todo?: TodoItem; buildings: BuildingData[]; createWorkOrder: (p: WorkOrderInput) => Promise<boolean>; onDone: () => void }) {
+export function WorkOrderForm({ todo, buildings, assets, createWorkOrder, onDone }: { todo?: TodoItem; buildings: BuildingData[]; assets: AssetOption[]; createWorkOrder: (p: WorkOrderInput) => Promise<boolean>; onDone: () => void }) {
   const [title, setTitle] = useState(todo?.text || "");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<WorkOrderPriority>(todo ? TODO_TO_WO_PRIORITY[todo.priority] : "medium");
@@ -12,10 +12,15 @@ export function WorkOrderForm({ todo, buildings, createWorkOrder, onDone }: { to
     const match = todo && buildings?.find((b) => b.name === todo.building);
     return match ? String(match.id) : "";
   });
+  const [assetId, setAssetId] = useState("");
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
     setSaving(true);
+    let assetIdValue: number | undefined = undefined;
+    if (assetId) {
+      assetIdValue = Number(assetId);
+    }
     const ok = await createWorkOrder({
       title: title.trim(),
       description: description.trim() || undefined,
@@ -23,6 +28,7 @@ export function WorkOrderForm({ todo, buildings, createWorkOrder, onDone }: { to
       due_date: dueDate || undefined,
       building_id: buildingId ? Number(buildingId) : undefined,
       todo_id: todo?.id,
+      asset_id: assetIdValue,
     });
     setSaving(false);
     if (ok) onDone();
@@ -36,6 +42,10 @@ export function WorkOrderForm({ todo, buildings, createWorkOrder, onDone }: { to
         <select value={buildingId} onChange={(e) => setBuildingId(e.target.value)} className="border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300 bg-white">
           <option value="">No building</option>
           {buildings?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+        <select value={assetId} onChange={(e) => setAssetId(e.target.value)} className="col-span-2 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300 bg-white">
+          <option value="">No asset</option>
+          {assets.map((a) => <option key={a.id} value={a.id}>{a.name} — {a.location}</option>)}
         </select>
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" rows={2} className="col-span-2 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-stone-300" />
       </div>

@@ -16,6 +16,7 @@ from sqlalchemy.orm import sessionmaker
 from app.auth import verify_token, security
 from app.database import get_db
 from app.migrations import migrate
+from tests.test_migrations import assert_columns_exist, planned_columns
 from app.models.account import Account
 from app.models.parish import Parish
 from app.models.parish_member import ParishMember
@@ -111,10 +112,11 @@ class PostgresConcurrencyTests(unittest.TestCase):
             connection.execute(text("INSERT INTO parishes (id, name) VALUES (7, 'Synthetic preserved parish')"))
             connection.execute(text("CREATE TABLE work_orders (id INTEGER PRIMARY KEY, title VARCHAR)"))
             connection.execute(text("INSERT INTO work_orders (id, title) VALUES (9, 'Synthetic preserved order')"))
-        plan = migrate(legacy)
-        self.assertEqual(len(plan["additive_statements"]), 3)
+        planned = planned_columns(migrate(legacy))
+        self.assertIn(("parishes", "owner_account_id"), planned)
         migrate(legacy, apply=True)
         self.assertEqual(migrate(legacy)["additive_statements"], [])
+        assert_columns_exist(self, legacy, planned)
         with legacy.connect() as connection:
             self.assertEqual(connection.execute(text("SELECT name FROM parishes WHERE id=7")).scalar(), "Synthetic preserved parish")
             self.assertEqual(connection.execute(text("SELECT title FROM work_orders WHERE id=9")).scalar(), "Synthetic preserved order")

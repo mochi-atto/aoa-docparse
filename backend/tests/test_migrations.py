@@ -1,6 +1,18 @@
+import re
 import unittest
 from sqlalchemy import create_engine, inspect, text
 from app.migrations import migrate
+
+
+def planned_columns(plan):
+    """(table, column) pairs named by the plan's ALTER TABLE ... ADD COLUMN statements."""
+    return {re.match(r"ALTER TABLE (\w+) ADD COLUMN (\w+)", s).groups() for s in plan["additive_statements"]}
+
+
+def assert_columns_exist(test, engine, columns):
+    schema = inspect(engine)
+    for table, column in columns:
+        test.assertIn(column, {c["name"] for c in schema.get_columns(table)}, f"{table}.{column}")
 
 
 class MigrationTests(unittest.TestCase):
@@ -35,10 +47,11 @@ class MigrationTests(unittest.TestCase):
             connection.execute(text("INSERT INTO parishes (id, name) VALUES (7, 'Synthetic existing parish')"))
             connection.execute(text("CREATE TABLE todos (id INTEGER PRIMARY KEY)"))
             connection.execute(text("CREATE TABLE work_orders (id INTEGER PRIMARY KEY)"))
-        self.assertEqual(len(migrate(engine)["additive_statements"]), 3)
+        planned = planned_columns(migrate(engine))
+        self.assertIn(("parishes", "owner_account_id"), planned)
         migrate(engine, apply=True)
+        self.assertEqual(migrate(engine)["additive_statements"], [])
+        assert_columns_exist(self, engine, planned)
         with engine.connect() as connection:
             self.assertEqual(connection.execute(text("SELECT name FROM parishes WHERE id=7")).scalar(), "Synthetic existing parish")
             self.assertIsNone(connection.execute(text("SELECT owner_account_id FROM parishes WHERE id=7")).scalar())
-        self.assertIn("todo_id", {c["name"] for c in inspect(engine).get_columns("work_orders")})
-        self.assertIn("status_before_hold", {c["name"] for c in inspect(engine).get_columns("work_orders")})

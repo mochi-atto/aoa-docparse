@@ -14,6 +14,7 @@ class WorkOrder(Base):
 
     building_id = Column(Integer, ForeignKey("buildings.id", ondelete="SET NULL"), nullable=True)
     todo_id = Column(Integer, ForeignKey("todos.id", ondelete="SET NULL"), nullable=True)  # backlog item this addresses
+    asset_id = Column(Integer, ForeignKey("assets.id", ondelete="SET NULL"), nullable=True)
 
     title = Column(String, nullable=False)
     description = Column(String, nullable=True)
@@ -37,6 +38,7 @@ class WorkOrder(Base):
 
     parish = relationship("Parish", back_populates="work_orders")
     building = relationship("Building")
+    asset = relationship("Asset")
 
     notes = relationship(
         "WorkOrderNote",
