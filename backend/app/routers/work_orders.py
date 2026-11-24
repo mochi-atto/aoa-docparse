@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
@@ -15,6 +15,7 @@ from app.models.history_entry import HistoryEntry
 from app.permissions import CurrentUser, get_current_user
 from app.models.asset import Asset
 from app.models.work_order_note import WorkOrderNote
+from app.services.work_order_notifications import notify_admins
 
 router = APIRouter()
 
@@ -153,6 +154,7 @@ def list_work_orders(
 def create_work_order(
     parish_id: int,
     data: WorkOrderCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
     membership=Depends(parish_editor_access),
@@ -233,6 +235,7 @@ def create_work_order(
 
     db.commit()
     db.refresh(order)
+    notify_admins(background_tasks, db, parish_id, order, "created", requester_name, membership.email)
     return order
 
 # claim a work order (unassigned -> assigned)
@@ -240,6 +243,7 @@ def create_work_order(
 def claim_work_order(
     parish_id: int,
     order_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
     membership=Depends(parish_editor_access),
@@ -262,6 +266,7 @@ def claim_work_order(
 
     db.commit()
     db.refresh(work_order)
+    notify_admins(background_tasks, db, parish_id, work_order, "claimed", display_name(db, user, membership), membership.email)
     return work_order
 
 # start a work order (assigned -> in_progress)
@@ -269,6 +274,7 @@ def claim_work_order(
 def start_work_order(
     parish_id: int,
     order_id: int,
+    background_tasks: BackgroundTasks,    
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
     membership=Depends(parish_editor_access),
@@ -291,6 +297,7 @@ def start_work_order(
 
     db.commit()
     db.refresh(work_order)
+    notify_admins(background_tasks, db, parish_id, work_order, "started", display_name(db, user, membership), membership.email)
     return work_order
 
 # hold a work order (assigned/in_progress -> on_hold)
@@ -298,6 +305,7 @@ def start_work_order(
 def hold_work_order(
     parish_id: int,
     order_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
     membership=Depends(parish_editor_access),
@@ -319,6 +327,7 @@ def hold_work_order(
 
     db.commit()
     db.refresh(work_order)
+    notify_admins(background_tasks, db, parish_id, work_order, "on_hold", display_name(db, user, membership), membership.email)
     return work_order
 
 # resume a work order (on_hold -> assigned/in_progress )
@@ -326,6 +335,7 @@ def hold_work_order(
 def resume_work_order(
     parish_id: int,
     order_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
     membership=Depends(parish_editor_access),
@@ -347,6 +357,7 @@ def resume_work_order(
 
     db.commit()
     db.refresh(work_order)
+    notify_admins(background_tasks, db, parish_id, work_order, "resumed", display_name(db, user, membership), membership.email)
     return work_order
 
 def authorize_assignee(order, membership, subject):
@@ -357,7 +368,7 @@ class SubmitRequest(BaseModel):
     completion_notes: str
 
 @router.post("/{parish_id}/work-orders/{order_id}/submit", response_model=WorkOrderResponse)
-def submit_work_order(parish_id: int, order_id: int, data: SubmitRequest,
+def submit_work_order(parish_id: int, order_id: int, background_tasks: BackgroundTasks, data: SubmitRequest,
                       membership=Depends(parish_editor_access), db: Session = Depends(get_db)):
     order = get_work_order(db, parish_id, order_id)
     authorize_assignee(order, membership, membership.account.auth0_sub)
@@ -371,10 +382,11 @@ def submit_work_order(parish_id: int, order_id: int, data: SubmitRequest,
         related_type="work_order", related_id=order.id))
     db.commit()
     db.refresh(order)
+    notify_admins(background_tasks, db, parish_id, order, "submitted", membership.email, membership.email)
     return order
 
 @router.post("/{parish_id}/work-orders/{order_id}/close", response_model=WorkOrderResponse)
-def close_work_order(parish_id: int, order_id: int,
+def close_work_order(parish_id: int, order_id: int, background_tasks: BackgroundTasks,
                      membership=Depends(parish_admin_access), db: Session = Depends(get_db)):
     order = get_work_order(db, parish_id, order_id)
     apply_transition(order, "close")
@@ -385,6 +397,7 @@ def close_work_order(parish_id: int, order_id: int,
         related_type="work_order", related_id=order.id))
     db.commit()
     db.refresh(order)
+    notify_admins(background_tasks, db, parish_id, order, "closed", membership.email, membership.email)
     return order
 
 MAX_NOTE_LENGTH = 5000

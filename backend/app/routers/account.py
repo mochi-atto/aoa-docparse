@@ -2,8 +2,6 @@ import secrets
 import hashlib
 from datetime import datetime, timedelta
 from sqlalchemy.exc import IntegrityError
-import smtplib
-from email.message import EmailMessage
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 import re
@@ -17,6 +15,8 @@ from app.models.parish import Parish
 from app.models.history_entry import HistoryEntry
 from typing import Literal
 from urllib.parse import urlparse
+import smtplib
+from app.services.mailer import email_configured, send_email
 
 router = APIRouter()
 
@@ -35,26 +35,17 @@ class InviteRequest(BaseModel):
 
 
 def send_invitation(email: str, parish_name: str, token: str):
-    if not settings.smtp_host or not settings.smtp_from:
+    if not email_configured():
         raise HTTPException(status_code=503, detail="Email delivery is not configured")
-    message = EmailMessage()
-    message["Subject"] = f"Invitation to join {parish_name}"
-    message["From"] = settings.smtp_from
-    message["To"] = email
-    message.set_content(
+    body = (
         f"You have been invited to join {parish_name}.\n\n"
         f"Create or sign in to your account here:\n"
         f"{settings.frontend_url}/invite/{token}\n"
     )
     try:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as server:
-            server.starttls()
-            if settings.smtp_username:
-                server.login(settings.smtp_username, settings.smtp_password)
-            server.send_message(message)
+        send_email(email, f"Invitation to join {parish_name}", body)
     except (OSError, smtplib.SMTPException) as error:
         raise HTTPException(status_code=502, detail="Invitation email could not be sent; please try again") from error
-
 
 @router.get("/me")
 def me(account=Depends(current_account)):
